@@ -73,13 +73,15 @@ const bowFx = () => { const s = sweep(), bp = band(); return fx(0.15, (t) => { c
 const pickFx = () => fx(0.2, (t) => { const f = t < 0.06 ? 880 : 1320, u = t < 0.06 ? t : t - 0.06; return (Math.sin(TAU * f * t) + 0.25 * Math.sin(TAU * f * 2.76 * t)) * Math.exp(-u * 20) * Math.min(1, u * 900); }, 20000);
 const drinkFx = () => { const s = sweep(); return fx(0.33, (t) => { const u = t % 0.11; return Math.sin(s(210 + 3600 * u)) * Math.sin(Math.PI * Math.min(1, u / 0.085)) ** 2; }, 22000); };
 const levelFx = () => fx(0.55, (t) => [[587, 0], [880, 0.09], [1175, 0.18]].reduce((a, [f, at]) => { const u = t - at; return u < 0 ? a : a + (Math.sin(TAU * f * u) + 0.3 * Math.sin(TAU * f * 2 * u) + 0.15 * Math.sin(TAU * f * 2.76 * u)) * Math.exp(-u * 6) * Math.min(1, u * 600); }, 0), 22000);
-const SOUNDS = [['swing', swingFx()], ['hit', hitFx()], ['hurt', hurtFx()], ['die', dieFx()], ['bow', bowFx()], ['pick', pickFx()], ['drink', drinkFx()], ['level', levelFx()]];
+const screamFx = () => { const s = sweep(), bp = band(), bp2 = band(), bp3 = band(); return fx(0.62, (t, k) => { const f = 430 + 330 * Math.min(1, t * 5) - 260 * Math.max(0, k - 0.55) + 14 * Math.sin(TAU * 11 * t); const v = saw(s(f)) + 0.45 * white(); return (bp(v, 900, 0.22) + 0.8 * bp2(v, 1500, 0.2) + 0.45 * bp3(v, 2700, 0.25)) * Math.min(1, t * 40) * (1 - 0.7 * k * k); }); };
+const SOUNDS = [['scream', screamFx()], ['swing', swingFx()], ['hit', hitFx()], ['hurt', hurtFx()], ['die', dieFx()], ['bow', bowFx()], ['pick', pickFx()], ['drink', drinkFx()], ['level', levelFx()]];
 const S = Object.fromEntries(SOUNDS.map(([n], i) => [n, INSTR.length + i]));
 // the effects in the game's order (a higher number wins when two are asked for in one frame): name, sound, pitch, volume, spread
 const EFFECTS = [
   ['swing', 'swing', 0x800, 46, 0x7f], ['coin', 'pick', 0xb00, 40, 0x3f], ['bow', 'bow', 0x800, 44, 0x7f], ['pickup', 'pick', 0x800, 52, 0],
   ['hit', 'hit', 0x800, 72, 0x7f], ['drink', 'drink', 0x800, 56, 0], ['hurt', 'hurt', 0x800, 70, 0x3f], ['mdie', 'die', 0x800, 66, 0x7f],
   ['level', 'level', 0x800, 64, 0], ['herodie', 'die', 0x500, 90, 0],
+  ['growl', 'die', 0x5a0, 84, 0], ['scream', 'scream', 0x800, 80, 0],
 ];
 const sfxtab = EFFECTS.flatMap(([, snd, pitch, vol, mask]) => {
   const ticks = Math.min(255, Math.ceil((SOUNDS[S[snd] - INSTR.length][1].length / RATE) * (0x800 / pitch) * 200) + 2);
@@ -163,7 +165,7 @@ const dsptab = [
 ];
 const CODE = 0x0300;
 // the tables follow the code (bits, the DSP settings, the song); assembled once to find where the code ends
-const build = (songAt, loopAt, dspAt, fxAt) => assembleSpc(`NOISECLK = $0e\nsong = ${songAt}\nsongloop = ${loopAt}\ndsptab = ${dspAt}\nsfxtab = ${fxAt}\n` + fs.readFileSync(path.join(root, 'src', 'spc_driver.s'), 'utf8'), CODE);
+const build = (songAt, loopAt, dspAt, fxAt, hold = 0) => assembleSpc(`NOISECLK = $0e\nHOLDSTART = ${hold}\nsong = ${songAt}\nsongloop = ${loopAt}\ndsptab = ${dspAt}\nsfxtab = ${fxAt}\n` + fs.readFileSync(path.join(root, 'src', 'spc_driver.s'), 'utf8'), CODE);
 let probe = build(0x2000, 0x2000, 0x1000, 0x1000);
 const bitsAt = CODE + probe.code.length, dspAt = bitsAt + 8, fxAt = dspAt + dsptab.length * 2 + 1, songAt = fxAt + sfxtab.length;
 const { code, labels } = build(songAt, songAt, dspAt, fxAt);
@@ -192,9 +194,14 @@ fs.writeFileSync(path.join(out, 'spc_1.bin'), upload.length > 0x8000 ? upload.su
 fs.writeFileSync(path.join(out, 'spc.json'), JSON.stringify({ load: 0x0200, entry: CODE, size: upload.length, seconds: (BARS * BAR * TICKS_PER_BEAT) / 200 }));
 console.log(`driver ${code.length} B, song ${stream.length} B, upload ${upload.length} B of ${ECHO_START - 0x200}, loop ${(BARS * BAR * TICKS_PER_BEAT) / 200} s`);
 
+// the same image with the music playing from the start: for the chip test (which never asks for it) and the previews
+const played = Buffer.from(image.slice(0x0200, free));
+build(songAt, songAt, dspAt, fxAt, 1).code.copy(played, CODE - 0x0200);
+fs.writeFileSync(path.join(out, 'spc_chip.bin'), played.subarray(0, 0x8000));
+
 // ---------------------------------------------------------------- the preview
 const secs = +(process.argv[2] || 72);
-const r = renderSpc(upload, 0x0200, CODE, secs);
+const r = renderSpc(played, 0x0200, CODE, secs);
 fs.writeFileSync(path.join(out, 'song_preview.wav'), wav(r.samples));
 let peak = 0, clipped = 0; const rms = [];
 for (let s = 0; s < r.samples.length; s += 2) { const v = Math.abs(r.samples[s]); peak = Math.max(peak, v); if (v >= 32760) clipped++; }
@@ -203,8 +210,8 @@ console.log(`preview ${secs} s: peak ${peak}, clipped samples ${clipped}, loudne
 
 // each effect in turn, a second and a half apart, over the music
 const asks = EFFECTS.flatMap((_, i) => [[2 + i * 1.5, 1, i + 1], [2.001 + i * 1.5, 2, i + 1]]);
-const f = renderSpc(upload, 0x0200, CODE, 2 + EFFECTS.length * 1.5, asks);
+const f = renderSpc(played, 0x0200, CODE, 2 + EFFECTS.length * 1.5, asks);
 fs.writeFileSync(path.join(out, 'effects_preview.wav'), wav(f.samples));
-const plain = renderSpc(upload, 0x0200, CODE, 2 + EFFECTS.length * 1.5);
+const plain = renderSpc(played, 0x0200, CODE, 2 + EFFECTS.length * 1.5);
 const diff = EFFECTS.map(([n], i) => { const a = Math.round((2 + i * 1.5) * 32000) * 2; let m = 0; for (let s = a; s < a + 16000; s++) m = Math.max(m, Math.abs(f.samples[s] - plain.samples[s])); return `${n} ${m}`; });
 console.log('effects heard (largest change in the quarter second after each):', diff.join(', '));

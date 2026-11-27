@@ -6,7 +6,7 @@
 ;   04 r d                             any DSP register
 ;   05                                 back to the loop point
 ; To the SNES: port 0 = tick counter, port 1 = times looped, port 2 = voices sounding, port 3 = $5A (alive).
-; From the SNES: port 1 = a sound effect (1..), then port 2 = a count that changes with every request. An effect takes
+; From the SNES: port 1 = a sound effect (1.., or $FE: start the music), then port 2 = a count that changes with every request. An effect takes
 ; voice 6 (the drum) or voice 4 (the bell), whichever is free or ends sooner; the song's notes for that voice are
 ; skipped until it is over. Effect table: sample, pitch low, high, volume, envelope 1, 2, length in ticks, pitch spread.
 DSPA = $f2
@@ -25,6 +25,7 @@ skips = $1b
 spread = $1c
 pl = $1d
 ph = $1e
+playing = $1f                        ; 0: the music waits for the SNES (the splash is silent but for its sounds)
 
 start:
   di
@@ -48,6 +49,7 @@ setupdone:
   mov t6, #0
   mov t4, #0
   mov seq, #0
+  mov playing, #HOLDSTART
   mov $f7, #$5a
   mov wait, #60                     ; let the echo buffer come round before it is written (0.3 s)
 settle:
@@ -65,6 +67,18 @@ settle:
   mov ptr+1, #(song >> 8)
 
 events:
+  mov a, playing
+  bne running
+idle:
+  mov a, $fd
+  beq idle
+  inc tick
+  mov a, tick
+  mov $f4, a
+  call !meter
+  call !effects
+  jmp !events
+running:
   call !next
   cmp a, #1
   bne notplay
@@ -223,6 +237,11 @@ wanted:
   bne known
   ret
 known:
+  cmp a, #$fe
+  bne aneffect
+  mov playing, #1
+  ret
+aneffect:
   dec a
   asl a
   asl a

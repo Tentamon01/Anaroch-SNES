@@ -1,9 +1,10 @@
-// Moves the hero at random (and through deaths) for thousands of frames and checks every shown tile against the world
-// data, every few frames. node tools/test_game.mjs [frames]
+// Plays at random for thousands of frames (walking, fighting, picking up, deaths, the bag and the character window),
+// and checks every shown tile against the world data, every few frames. node tools/test_game.mjs [frames]
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { Snes } from './snes.mjs';
+import { boot } from './boot.mjs';
 
 const root = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
 const rom = fs.readFileSync(path.join(root, 'out', 'anaroch_game.sfc'));
@@ -19,17 +20,37 @@ const cell = (c, r) => {
 };
 let seed = 5; const rnd = (n) => (seed = (seed * 16807) % 2147483647) % n;
 const PADS = [0x0800, 0x0400, 0x0200, 0x0100, 0x0A00, 0x0900, 0x0600, 0x0500];
-let checked = 0, bad = 0, firstBad = null, deaths = 0, pad = 0, worstQ = 0;
+let textBad = 0, opened = 0, bagFrames = 0, winFrames = 0, most = 0, checked = 0, bad = 0, firstBad = null, deaths = 0, pad = 0, worstQ = 0;
 s.breaks.set(sy.FlushQueue, () => { worstQ = Math.max(worstQ, w(sy.sq) / sy.QREC); });
 const N = +(process.argv[2] || 3000);
+boot(s, sy);
 for (let f = 0; f < N; f++) {
   if (f % 90 === 0) pad = PADS[rnd(8)];
   s.pad = pad | (f % 23 < 3 ? 0x8000 : 0);
   if (w(sy.mode) === 1) { s.pad = f % 20 < 4 ? 0x1000 : 0; }
+  const pw = (a, v) => { s.wram[a] = v & 255; s.wram[a + 1] = (v >> 8) & 255; };
+  if (f % 150 === 20 && w(sy.mode) === 0) {          // a weakened monster in front of the hero: kills, so pieces drop
+    const m = 1 + rnd(8);
+    if (w(sy.est + m * 2) < 4) { pw(sy.ex + m * 2, w(sy.ex)); pw(sy.ey + m * 2, w(sy.ey) + 200); pw(sy.ehp + m * 2, 1); pw(sy.echamp + m * 2, rnd(2)); pw(sy.edir, 0); }
+  }
+  if (f % 7 === 0 && w(sy.mode) === 0) s.pad |= 0x0080;                  // A: pick up
+  if (f % 601 === 300 && w(sy.mode) === 0) s.pad = 0x2000;               // Select: the bag
+  if (w(sy.mode) === 4) {                                                // in the bag: buttons at random, then close
+    const keys = [0x0800, 0x0400, 0x0200, 0x0100, 0x0200, 0x0080, 0x0040, 0x4000, 0x0020, 0];
+    s.pad = f % 4 === 0 ? keys[rnd(10)] : 0; if (f % 601 > 450 && f % 8 < 2) s.pad = 0x8000; bagFrames++;
+  }
+  if (w(sy.mode) === 3) { const keys = [0x0800, 0x0400, 0x0080, 0x0020, 0x8000, 0]; s.pad = f % 6 === 0 ? keys[rnd(6)] : 0; winFrames++; }
   const m0 = w(sy.mode);
   s.runFrame(60000);
   if (m0 !== 1 && w(sy.mode) === 1) deaths++;
-  if (f % 5 !== 4 || w(sy.sq) || !(s.reg[0x420C] & 0x80)) continue;
+  if (m0 === 0 && w(sy.mode) === 4) opened++;
+  let pieces = 0; for (let p = 0; p < 40; p++) if (w(0x2000 + p * 64)) pieces++; most = Math.max(most, pieces);
+  // the text layer in video memory is what the game's own copy says (nothing left over from other screens)
+  if (f % 50 === 49 && !w(sy.inMenu) && !w(sy.rebuild) && (s.reg[0x420C] & 0x80)) {
+    let pending = false; for (let r = 0; r < 32; r++) if (s.wram[sy.hudd + r]) pending = true;
+    if (!pending) for (let i = 0; i < 2048; i++) if (s.vram[0x9000 + i] !== s.wram[sy.hudmap + i]) { textBad++; break; }
+  }
+  if (f % 5 !== 4 || w(sy.sq) || w(sy.inMenu) || w(sy.rebuild) || !(s.reg[0x420C] & 0x80)) continue;
   const camx = w(sy.camx), camy = w(sy.camy);
   // (the camera in the variables may be a frame ahead of what has been sent: check what the scroll registers show)
   const hx = s.scroll.h & 0x3FF, vy = s.scroll.v & 0x3FF;
@@ -44,6 +65,9 @@ for (let f = 0; f < N; f++) {
     if (!ok) { bad++; if (!firstBad) firstBad = { f, c, r, slot, pal, want, id, camx, camy }; }
   }
 }
+console.log(`text layer checked: ${textBad} times unlike the game's copy`);
+if (textBad) process.exitCode = 1;
+console.log(`bag opened ${opened} times (${bagFrames} frames, character window ${winFrames}); most pieces carried ${most}; level ${w(sy.level)}; gold ${w(sy.gold)}`);
 console.log(`checked ${checked} shown tiles over ${N} frames: ${bad} wrong; deaths ${deaths}; most stream records in a frame ${worstQ}; slowdowns ${w(sy.lagc)}; kills ${w(sy.kills)}`);
 if (firstBad) console.log('first wrong', firstBad);
-process.exit(bad ? 1 : 0);
+process.exit(bad || textBad ? 1 : 0);

@@ -4,6 +4,7 @@ import path from 'node:path';
 import { execFileSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { Snes } from './snes.mjs';
+import { boot } from './boot.mjs';
 
 const root = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
 const s = new Snes(fs.readFileSync(path.join(root, 'out', 'anaroch_game.sfc')), { program: 0x200000 });
@@ -15,6 +16,7 @@ let t0 = 0, worst = 0, sum = 0, cnt = 0;
 s.breaks.set(sy.MainLoop, (c) => { t0 = c.cyc; });
 s.breaks.set(sy.WaitVbl, (c) => { const d = c.cyc - t0; if (d > 0) { worst = Math.max(worst, d); sum += d; cnt++; } });
 let shot = 0;
+if (!process.argv.includes('--splash')) boot(s, sy);
 for (const st of steps) {
   s.pad = st.pad;
   for (let i = 0; i < st.n; i++) s.runFrame(60000);

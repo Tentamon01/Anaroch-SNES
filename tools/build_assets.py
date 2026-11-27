@@ -213,7 +213,30 @@ def arrow_img(d):
     dr.point((round(x1), round(y1)), fill=(210, 210, 220, 255))
     return im
 
+def gear_img():
+    im = Image.new('RGBA', (16, 16), (0, 0, 0, 0)); d = ImageDraw.Draw(im)
+    d.ellipse((3, 9, 13, 14), fill=(60, 45, 30, 255)); d.ellipse((4, 8, 12, 12), fill=(110, 85, 55, 255))
+    d.line((4, 12, 12, 3), fill=(200, 205, 215, 255), width=2); d.line((9, 3, 13, 7), fill=(240, 196, 60, 255)); d.point((13, 2), fill=(255, 255, 255, 255))
+    return im
+
+def scroll_img():
+    im = Image.new('RGBA', (16, 16), (0, 0, 0, 0)); d = ImageDraw.Draw(im)
+    d.rectangle((4, 5, 11, 12), fill=(215, 195, 150, 255)); d.rectangle((3, 4, 12, 5), fill=(240, 225, 185, 255)); d.rectangle((3, 12, 12, 13), fill=(170, 145, 100, 255))
+    for y in (7, 9): d.line((5, y, 10, y), fill=(110, 80, 50, 255))
+    return im
+
+def key_img():
+    im = Image.new('RGBA', (16, 16), (0, 0, 0, 0)); d = ImageDraw.Draw(im)
+    d.ellipse((3, 6, 7, 10), outline=(240, 196, 60, 255), width=1); d.line((7, 8, 13, 8), fill=(240, 196, 60, 255), width=1)
+    d.line((11, 9, 11, 11), fill=(200, 150, 40, 255)); d.line((13, 9, 13, 11), fill=(200, 150, 40, 255))
+    return im
+
+def stamina_img():
+    r, g, b, al = potion_img().split()
+    return Image.merge('RGBA', (g, r, b, al))
+
 smalls = [potion_img(), gold_img(), tome_img()] + [arrow_img(d) for d in range(8)]
+if PLACED: smalls += [gear_img(), scroll_img(), key_img(), stamina_img()]
 small_cols, small_near = quantize(smalls, 15)
 # tiles $80..$BF (4 rows of 16): the 16x16 pictures go at $80,$82,..,$8E then $A0,$A2,...
 obj_static = bytearray(4 * 16 * 32)
@@ -230,7 +253,11 @@ HUD_RGB = [(0, 0, 0), (12, 10, 10), (40, 34, 30), (70, 58, 40), (220, 170, 40), 
 vial_e = Image.open(os.path.join(ASSETS, 'hud_vial_empty.png')).convert('RGBA').resize((16, 48), Image.LANCZOS)
 vial_f = Image.open(os.path.join(ASSETS, 'hud_vial_full.png')).convert('RGBA').resize((16, 48), Image.LANCZOS)
 pot16 = potion_img()
-vcols, vnear = quantize([vial_e, vial_f, pot16], 8)   # colours 6..13
+vcols, vnear = quantize([vial_e, vial_f, pot16], 7 if PLACED else 8)   # colours 6..13
+if PLACED:                                  # colour 13: the green of a stamina potion
+    vcols = list(vcols) + [(48, 168, 72)]
+    _near = vnear
+    vnear = lambda c: 13 if c[1] > c[0] + 30 and c[1] > c[2] else _near(c)
 hud_pal = [bgr555(c) for c in HUD_RGB] + [bgr555(c) for c in vcols] + [bgr555((90, 80, 70)), bgr555((235, 230, 225))]   # 14 shadow, 15 ink
 def vidx(im):
     return Image.eval(index_img(im, vnear), lambda v: 0 if v == 0 else v + 5)
@@ -261,6 +288,8 @@ FONT = {
  '!': '00100 00100 00100 00100 00100 00000 00100',
 }
 CHARS = ' 0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ/:+-.()>\'!'
+if PLACED:
+    CHARS += '%'; FONT['%'] = '11001 11010 00010 00100 01000 01011 10011'
 FONT_BASE = len(hud_tiles)
 for ch in CHARS:
     rows = FONT[ch].split() if FONT[ch] else []
@@ -298,12 +327,25 @@ VIAL_TOP, VIAL_BOT = round(15 * 48 / 128), round(121 * 48 / 128)
 # belt slots (16x16 = 2x2 tiles): frame normal / selected, empty / potion
 BELT_BASE = len(hud_tiles)
 p16 = vidx(pot16)
+pictures = [None, p16] + ([vidx(stamina_img()), vidx(scroll_img()), vidx(key_img())] if PLACED else [])
+if PLACED:                                  # (the scroll and the key in the HUD's own tan and gold)
+    for k_, img_, inks in ((3, scroll_img(), (15, 15, 14, 3)), (4, key_img(), (4, 4, 4, 4))):
+        im_ = Image.new('P', (16, 16), 0)
+        if k_ == 3:                        # (a scroll that still reads at twelve pixels)
+            d_ = ImageDraw.Draw(im_); d_.rectangle((3, 3, 12, 13), fill=15); d_.rectangle((2, 2, 13, 4), fill=14); d_.rectangle((2, 12, 13, 13), fill=14)
+            for y_ in (6, 9): d_.rectangle((5, y_, 10, y_ + 1), fill=3)
+            pictures[k_] = im_; continue
+        for y in range(16):
+            for x in range(16):
+                c = img_.getpixel((x, y))
+                if c[3] >= 128: im_.putpixel((x, y), inks[0] if c[0] > 225 else inks[1] if c[0] > 200 else inks[2] if c[0] > 150 else inks[3])
+        pictures[k_] = im_
 for sel in range(2):
-    for content in range(2):
+    for content in range(len(pictures)):
         im = Image.new('P', (16, 16), 5)
         d = ImageDraw.Draw(im); d.rectangle((0, 0, 15, 15), outline=4 if sel else 3)
         if content:
-            sm = p16.resize((12, 12), Image.NEAREST)
+            sm = pictures[content].resize((12, 12), Image.NEAREST)
             for y in range(12):
                 for x in range(12):
                     v = sm.getpixel((x, y))
@@ -311,8 +353,13 @@ for sel in range(2):
         t = tiles_of(im)
         for ty in range(2):
             for tx in range(2): add_tile(t[ty][tx])
+CUR_BASE = len(hud_tiles)
+if PLACED:                                  # the bag screen's cursor: corners TL TR BL BR, edges top, bottom, left, right
+    def cur(test): add_tile([4 if test(x, y) else 0 for y in range(8) for x in range(8)])
+    cur(lambda x, y: x < 2 or y < 2); cur(lambda x, y: x > 5 or y < 2); cur(lambda x, y: x < 2 or y > 5); cur(lambda x, y: x > 5 or y > 5)
+    cur(lambda x, y: y < 2); cur(lambda x, y: y > 5); cur(lambda x, y: x < 2); cur(lambda x, y: x > 5)
 hud_bin = b''.join(enc_tile(t) for t in hud_tiles)
-assert len(hud_tiles) <= 512
+assert len(hud_tiles) <= (256 if PLACED else 512), len(hud_tiles)
 # text palettes: 1 white, 2 gold, 3 red, 4 grey (only ink 15 differs)
 def txt_pal(ink): return hud_pal[:15] + [bgr555(ink)]
 hud_pals = hud_pal + txt_pal((240, 196, 60)) + txt_pal((230, 60, 50)) + txt_pal((150, 150, 150))
@@ -675,7 +722,7 @@ sp_px = [px(a, b) for a, b in spawns]
 st = px(*start)
 
 lines = ['; generated by tools/build_assets.py - do not edit', f'START_X = {st[0] - 24}', f'START_Y = {st[1]}',
-         f'FONT_BASE = {FONT_BASE}', f'FONT2_BASE = {FONT2_BASE}', f'VIAL_BASE = {VIAL_BASE}', f'BELT_BASE = {BELT_BASE}', f'VIAL_TOP = {VIAL_TOP}', f'VIAL_BOT = {VIAL_BOT}',
+         f'FONT_BASE = {FONT_BASE}', f'FONT2_BASE = {FONT2_BASE}', f'VIAL_BASE = {VIAL_BASE}', f'BELT_BASE = {BELT_BASE}', f'CUR_BASE = {CUR_BASE}', f'VIAL_TOP = {VIAL_TOP}', f'VIAL_BOT = {VIAL_BOT}',
          f'HUD_TILES_BYTES = {len(hud_bin)}', f'SPAWN_COUNT = {len(sp_px)}', f'FRAMES = {FRAMES}',
          f'BRAZIER_TYPE = {BRAZIER_TYPE}', f'M7_PY = {M7_PY}', f'M7_SPLIT = {M7_SPLIT}', f'RELY_MIN = {RELY_MIN}', f'RELY_MAX = {RELY_MAX}',
          f'ROT_C = {round(CY * 256)}', f'ROT_S = {round(SY * 256)}']

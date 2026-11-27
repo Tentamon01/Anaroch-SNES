@@ -7,6 +7,7 @@ src/data.inc
 # local copy of ares with the dual-chip board (binaries)
 ares_dual/
 
-# generated from src/main.asm and the renders
-src/game.asm
+# generated from the renders
 src/world.inc
+src/rules.inc
+src/splash.inc

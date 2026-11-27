@@ -57,7 +57,7 @@ export class Snes {
       if (a < 0x2000) return this.wram[a];
       if (a >= 0x8000) return this.romAt(b, a);
       if (a === 0x4210) { const v = this.nmiFlag ? 0x80 : 0; this.nmiFlag = 0; return v | 2; }
-      if (a === 0x4212) return 0;
+      if (a === 0x4212) return this.cyc > (this.budget || 51000) * 0.86 ? 0x80 : 0;     // (vertical blank: the frame's end)
       if (a === 0x4218) return this.pad & 0xFF;
       if (a === 0x4219) return this.pad >> 8;
       if (a >= 0x4214 && a <= 0x4217) return this.mathRd(a);
@@ -89,6 +89,8 @@ export class Snes {
       case 0x210E: this.m7[a] = (v << 8) | this.m7latch; this.m7latch = v; this.scroll.v = (v << 8) | this.scroll.prev; this.scroll.prev = v; break;
       case 0x2111: { const q = this.scroll3 || (this.scroll3 = { h: 0, v: 0 }); q.h = (v << 8) | (this.scroll.prev & ~7) | ((q.h >> 8) & 7); this.scroll.prev = v; break; }
       case 0x2112: { const q = this.scroll3 || (this.scroll3 = { h: 0, v: 0 }); q.v = (v << 8) | this.scroll.prev; this.scroll.prev = v; break; }
+      case 0x210F: { const q = this.scroll2 || (this.scroll2 = { h: 0, v: 0x3FF }); q.h = (v << 8) | (this.scroll.prev & ~7) | ((q.h >> 8) & 7); this.scroll.prev = v; break; }
+      case 0x2110: { const q = this.scroll2 || (this.scroll2 = { h: 0, v: 0x3FF }); q.v = (v << 8) | this.scroll.prev; this.scroll.prev = v; break; }
       case 0x2116: this.vaddr = (this.vaddr & 0xFF00) | v; break;
       case 0x2117: this.vaddr = (this.vaddr & 0xFF) | (v << 8); break;
       case 0x2118: case 0x2119: {
@@ -116,6 +118,7 @@ export class Snes {
       if (!fixed) src = (src + (dec ? -1 : 1)) & 0xFFFF;
     }
     this.cyc += n * 2;
+    this.reg[base + 2] = src & 255; this.reg[base + 3] = src >> 8;      // (the source address moves on, as in the chip)
     this.reg[base + 5] = 0; this.reg[base + 6] = 0;
   }
   // ---- CPU helpers
@@ -294,7 +297,7 @@ export class Snes {
   }
   // one frame: active display, then vblank with NMI. Returns cycles the game used before it idled (approx).
   runFrame(budget = 51000) {
-    this.cyc = 0;
+    this.cyc = 0; this.budget = budget;
     this.nmiFlag = 1;
     if (this.reg[0x4200] & 0x80) this.nmi();
     let irqDone = !(this.reg[0x4200] & 0x20);
@@ -324,7 +327,7 @@ export class Snes {
     const chrBase = (this.reg[0x210B] & 0xF) << 13;
     const hofs = this.scroll.h & 0x3FF, vofs = this.scroll.v & 0x3FF;
     const objBase = (this.reg[0x2101] & 7) << 14, sizes = [[8, 16], [8, 32], [8, 64], [16, 32], [16, 64], [32, 64]][this.reg[0x2101] >> 5];
-    const spr = new Int16Array(W * H).fill(-1);
+    const spr = new Int16Array(W * H).fill(-1), sprp = new Uint8Array(W * H);
     for (let n = 127; n >= 0; n--) {
       const x0 = this.oam[n * 4], y0 = this.oam[n * 4 + 1], tile = this.oam[n * 4 + 2], at = this.oam[n * 4 + 3];
       const hb = (this.oam[512 + (n >> 2)] >> ((n & 3) * 2)) & 3;
@@ -336,7 +339,7 @@ export class Snes {
         const t = ((tile & 0xF0) + ((ty >> 3) << 4)) & 0xF0 | ((tile + (tx >> 3)) & 0xF);
         const name = (at & 1) << 8;
         const v = this.tilePx(objBase, name | t, tx & 7, ty & 7);
-        if (v) spr[sy * W + sx] = pal + v;
+        if (v) { spr[sy * W + sx] = pal + v; sprp[sy * W + sx] = (at >> 4) & 3; }
       }
     }
     // HDMA: the tables are walked line by line, writing the registers before each line is drawn
@@ -363,11 +366,12 @@ export class Snes {
           if (!hdr) ch.on = false; else { ch.count = hdr & 0x7F; ch.rep = !!(hdr & 0x80); ch.xfer = true; }
         } else ch.xfer = ch.rep;
       }
+      const winL = this.reg[0x2126], winR = this.reg[0x2127], winObj = (this.reg[0x212E] & 0x10) && (this.reg[0x2125] & 2);   // window 1 on the sprites
       const mode = this.reg[0x2105] & 7, tm = this.reg[0x212C], bright = this.reg[0x2100] & 15, blank = this.reg[0x2100] & 0x80;
       const A = s16(this.m7[0x211B] || 0), B = s16(this.m7[0x211C] || 0), C = s16(this.m7[0x211D] || 0), D = s16(this.m7[0x211E] || 0);
       const X0 = s13(this.m7[0x211F] || 0), Y0 = s13(this.m7[0x2120] || 0), MH = s13(this.m7[0x210D] || 0), MV = s13(this.m7[0x210E] || 0);
       for (let x = 0; x < W; x++) {
-      let ci = 0;
+      let ci = 0, hi1 = false;
       if ((tm & 1) && mode === 7) {
         const u = x + MH - X0, v = y + MV - Y0;
         const tx = ((A * u + B * v) >> 8) + X0, ty = ((C * u + D * v) >> 8) + Y0;
@@ -380,21 +384,32 @@ export class Snes {
         const e = this.vram[mb & 0xFFFF] | (this.vram[(mb + 1) & 0xFFFF] << 8);
         let tx = px & 7, ty = py & 7; if (e & 0x4000) tx = 7 - tx; if (e & 0x8000) ty = 7 - ty;
         const v = this.tilePx(chrBase, e & 0x3FF, tx, ty);
-        if (v) ci = ((e >> 10) & 7) * 16 + v;
+        if (v) { ci = ((e >> 10) & 7) * 16 + v; hi1 = !!(e & 0x2000); }
       }
       // BG2 (mode 1 only; 32x32 map, the one-line offset): low-priority tiles under the sprites, high ones over them
       let b2 = 0, b2hi = false;
       if ((tm & 2) && mode === 1) {
         const m2 = (this.reg[0x2108] & 0xFC) << 9, c2 = (this.reg[0x210B] >> 4) << 13;
-        const py = (y - 1 + 256) & 255;
+        const py = (y + ((this.scroll2 ? this.scroll2.v : 0x3FF) & 0x3FF)) & 255;
         const e = this.vram[(m2 + ((py >> 3) * 32 + (x >> 3)) * 2) & 0xFFFF] | (this.vram[(m2 + ((py >> 3) * 32 + (x >> 3)) * 2 + 1) & 0xFFFF] << 8);
         const v = this.tilePx(c2, e & 0x3FF, x & 7, py & 7);
         if (v) { b2 = ((e >> 10) & 7) * 16 + v; b2hi = !!(e & 0x2000); }
       }
-      let math = ci ? this.reg[0x2131] & 1 : 0;             // which layer is on top decides whether BG3 is added
-      if (b2 && !b2hi) { ci = b2; math = 0; }
-      if ((tm & 0x10) && spr[y * W + x] >= 0) { ci = spr[y * W + x]; math = ci >= 192 ? this.reg[0x2131] & 0x10 : 0; }
-      if (b2 && b2hi) { ci = b2; math = 0; }
+      // the front-most of: S3, BG1 high, BG2 high, S2, BG1 low, BG2 low, S1 / S0; which decides whether BG3 is added
+      const o = (tm & 0x10) && !(winObj && x >= winL && x <= winR) ? spr[y * W + x] : -1, op = sprp[y * W + x];
+      let math = 0;
+      const b1 = ci;
+      if (o >= 0 && op === 3) ci = -1;
+      else if (b1 && hi1) ci = -2;
+      else if (b2 && b2hi) ci = -3;
+      else if (o >= 0 && op === 2) ci = -1;
+      else if (b1) ci = -2;
+      else if (b2) ci = -3;
+      else if (o >= 0) ci = -1;
+      else ci = 0;
+      if (ci === -1) { ci = o; math = o >= 192 ? this.reg[0x2131] & 0x10 : 0; }
+      else if (ci === -2) { ci = b1; math = this.reg[0x2131] & 1; }
+      else if (ci === -3) ci = b2;
       let [r, g, b] = this.color(ci);
       if (math && mode === 1 && (this.reg[0x2130] & 2) && (this.reg[0x212D] & 4)) {    // add the second screen: BG3, 64x32
         const q = this.scroll3 || { h: 0, v: 0 }, px = (x + (q.h & 0x3FF)) & 511, py = (y + (q.v & 0x3FF)) & 255;

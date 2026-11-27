@@ -10,6 +10,8 @@ SFX_HURT = 7
 SFX_MDIE = 8
 SFX_LEVEL = 9
 SFX_DIE = 10
+SFX_GROWL = 11               ; (the splash)
+SFX_SCREAM = 12
 
 ; Sfx: A = effect. X and Y kept
 Sfx:

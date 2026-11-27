@@ -81,21 +81,35 @@ about 61 s, looping), and renders a preview to `out/audio/song_preview.wav` with
 `tools/spc700.mjs` (an approximation; ares is the reference). About 15 KB of the sound chip's 64 KB are used,
 plus 16 KB of echo. No sound effects yet, and the game itself does not play it yet.
 
-## The remake: step 1 (done, approved 2026-11-27)
-`out/anaroch_game.sfc`: the graveyard in the new three-quarter view, with the first version's rules and eight monsters.
-Done: the streamed world, camera and movement in the new view, combat, loot, HUD, walking behind walls, trees and
-graves, the braziers' glow, the graveyard music and ten sound effects, and whole figures in every pose.
+## The remake
+`out/anaroch_game.sfc`: it opens with the studio's splash (A or Start skips it), then the graveyard in the three-quarter
+view with eight monsters.
+
+- **Step 1 (approved 2026-11-27):** the streamed world, movement, walking behind walls, trees and graves, the braziers'
+  glow, the music and sound effects, whole figures in every pose.
+- **Step 2, part 1:** the N64 version's items: five qualities, affixes and uniques, drops, a bag with pictures, seven
+  worn slots, the belt, five stats, its damage formula and experience curve. Parts to come: skills, Stormreach Keep
+  with its people and shop, saving.
+
+Pad: B attack, A pick up, X drink or read from the belt, L / R choose a belt place, Select the bag (there: A wear or
+take off, X use, Y drop, L or R the character window), Start pause.
 
     python tools/build_assets.py --placed        # characters (a square per pose), HUD
     node tools/make_area_unlit.mjs && node tools/render_area.mjs gymoon t1 --from=out/step0/graveyard_unlit.glb --flat --moon --exposure=1.9
     node tools/render_area.mjs gymoon t1 --from=out/step0/graveyard_unlit.glb --flat --moon --exposure=1.9 --front
     python tools/build_world.py                  # tiles, map, walk-behind blocks, glow and src/world.inc
+    python tools/build_rules.py                  # item tables and pictures from the N64 version (src/rules.inc)
+    python tools/build_splash.py                 # the splash, drawn from the N64 version's scene (src/splash.inc)
     node tools/build_audio.mjs                   # music, effects and the sound driver
-    python tools/mkgame.py                       # src/game.asm from src/main.asm (edit mkgame.py, not game.asm)
     node tools/build_game.mjs                    # out/anaroch_game.sfc + .bml for ares_dual
-    node tools/test_game.mjs 3000                # random walking; every shown tile checked against the world data
+    node tools/test_rules.mjs                    # the item, stat, damage and experience rules, called in the ROM
+    node tools/test_game.mjs 3000                # random play; every shown tile and the text layer checked
     ares_dual/ares.exe --system "Super Famicom" --no-file-prompt out/anaroch_game.sfc
 
+- **Source:** `src/game.asm` and `src/game/*.asm`; the rules and the bag screen in `src/rules/` (ROM bank 42); the
+  splash player in `src/splash.asm`. (The first version's `src/main.asm` is kept for its own build.)
+- **Not yet like the N64:** the hero always looks like a swordsman, whatever is worn; a bow shoots but is not drawn;
+  weapons have no special tricks yet; the warning screen and the title screen are not made.
 - **Characters:** a 32x32 square couldn't hold every pose from one fixed spot (feet were cut off in most of them),
   so each pose has its own place for the square, and the widest or tallest ones get one 16x16 piece more.
 - **Walking behind things** (`src/occlude.asm`): everything that stands up is cut into 16x16 blocks with a depth and,

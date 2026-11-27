@@ -125,9 +125,11 @@ Each step ends in a ROM you can run, and the next starts after you have seen it.
 - Its music and the first sound effects.
 - *Done when:* you approve how it looks, sounds and plays. This sets the standard for everything after.
 
-**2. The core of the RPG**
-- Stats, skills, items, bag and equipment, belt, drops.
-- Stormreach Keep with its people and shop, gates between areas, saving.
+**2. The core of the RPG**, in four parts
+- *2a (built 2026-11-27):* stats, items, bag and equipment, belt, drops. Also the studio's splash, as the N64's.
+- *2b:* skills and their trees, stamina, the skill button.
+- *2c:* Stormreach Keep with its people and shop, gates between areas.
+- *2d:* saving.
 
 **3. Act I complete**
 - All its areas, quests, the mercenary, waypoints, the act's boss drawn by the SuperFX.

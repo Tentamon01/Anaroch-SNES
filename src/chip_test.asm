@@ -941,7 +941,7 @@ loop_size = loop_end - $1000
  .incbin "../out/chip/textures.bin"
 .bank 2
 spc_data:
- .incbin "../out/audio/spc_0.bin"      ; (the music is all in the first 32 KB; effects are not used here)
+ .incbin "../out/audio/spc_chip.bin"   ; (the music is all in the first 32 KB; effects are not used here)
 .bank 3
 font_data:
  .incbin "../out/chip/font.bin"
