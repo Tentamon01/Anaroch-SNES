@@ -21,7 +21,7 @@ packed.copy(data, 0x1000);
 picture.copy(data, 0x80000);                           // the original, to compare with
 const spc = JSON.parse(fs.readFileSync(path.join(out, 'audio', 'spc.json'), 'utf8'));
 const sum = picture.reduce((a, b) => (a + b) & 0xFFFF, 0);
-const { rom, syms } = assemble(path.join(root, 'src', 'chip_test.asm'), { banks: 16, defines: { SPC_SIZE: spc.size, SPC_ENTRY: spc.entry, PIC_BYTES: picture.length, PIC_SUM: sum } });
+const { rom, syms } = assemble(path.join(root, 'src', 'chip_test.asm'), { banks: 16, defines: { SPC_SIZE: Math.min(spc.size, 0x8000), SPC_ENTRY: spc.entry, PIC_BYTES: picture.length, PIC_SUM: sum } });
 const sfc = Buffer.concat([rom, data]);
 fs.writeFileSync(path.join(out, 'anaroch_chiptest.sfc'), sfc);
 fs.writeFileSync(path.join(out, 'anaroch_chiptest.sym.json'), JSON.stringify(syms, null, 1));

@@ -81,6 +81,32 @@ about 61 s, looping), and renders a preview to `out/audio/song_preview.wav` with
 `tools/spc700.mjs` (an approximation; ares is the reference). About 15 KB of the sound chip's 64 KB are used,
 plus 16 KB of echo. No sound effects yet, and the game itself does not play it yet.
 
+## The remake: step 1 (done, approved 2026-11-27)
+`out/anaroch_game.sfc`: the graveyard in the new three-quarter view, with the first version's rules and eight monsters.
+Done: the streamed world, camera and movement in the new view, combat, loot, HUD, walking behind walls, trees and
+graves, the braziers' glow, the graveyard music and ten sound effects, and whole figures in every pose.
+
+    python tools/build_assets.py --placed        # characters (a square per pose), HUD
+    node tools/make_area_unlit.mjs && node tools/render_area.mjs gymoon t1 --from=out/step0/graveyard_unlit.glb --flat --moon --exposure=1.9
+    node tools/render_area.mjs gymoon t1 --from=out/step0/graveyard_unlit.glb --flat --moon --exposure=1.9 --front
+    python tools/build_world.py                  # tiles, map, walk-behind blocks, glow and src/world.inc
+    node tools/build_audio.mjs                   # music, effects and the sound driver
+    python tools/mkgame.py                       # src/game.asm from src/main.asm (edit mkgame.py, not game.asm)
+    node tools/build_game.mjs                    # out/anaroch_game.sfc + .bml for ares_dual
+    node tools/test_game.mjs 3000                # random walking; every shown tile checked against the world data
+    ares_dual/ares.exe --system "Super Famicom" --no-file-prompt out/anaroch_game.sfc
+
+- **Characters:** a 32x32 square couldn't hold every pose from one fixed spot (feet were cut off in most of them),
+  so each pose has its own place for the square, and the widest or tallest ones get one 16x16 piece more.
+- **Walking behind things** (`src/occlude.asm`): everything that stands up is cut into 16x16 blocks with a depth and,
+  for walls, a direction. Blocks in front of a character are drawn again over it as sprites (at most 16 a frame).
+- **Glow:** a dithered 3-colour layer on background 3, added to the world by colour math.
+- **Frame budget:** the screen is updated in the 54 blank lines. The character window shows `SLOWDOWNS` (frames the
+  game did not finish in time) and `BUSY` (the most lines an update has taken; over 54 would be too many). The code
+  runs as fast ROM, and the camera brings in at most one new row or column of tiles a frame.
+- **Sound** (`src/sound.asm`, `src/spc_driver.s`): effects borrow the drum's or the bell's voice for a moment.
+  `node tools/build_audio.mjs` also writes `out/audio/effects_preview.wav`.
+
 ## The remake: step 0
 The plan and the results are in `docs/REMAKE_PLAN.md`.
 

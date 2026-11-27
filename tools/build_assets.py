@@ -5,7 +5,7 @@ Reads:  ../Anaroch_N64_Sprite/assets/spr_<hero|ghoul|skel>_<anim>_<dir>.png + sr
         ../Anaroch_N64_Sprite/src/area_graveyard.h                                                (collision grid, braziers, spawns)
 Writes: out/*.bin and src/data.inc
 """
-import os, re, math, random
+import os, re, sys, math, random
 from PIL import Image, ImageDraw
 
 HERE = os.path.dirname(os.path.abspath(__file__))
@@ -73,6 +73,34 @@ PICK = [(0, 0), (0, 3), (1, 0), (1, 3), (1, 6), (1, 9), (2, 1), (2, 4), (2, 7), 
 FRAMES = len(PICK)  # 0-1 idle, 2-5 walk, 6-9 attack, 10 hit, 11-14 death
 
 
+PLACED = '--placed' in sys.argv    # for the remake: each pose's square sits where its figure is (tools/mkgame.py reads it)
+
+
+def place_pose(im, ox, oy):
+    """the 32 x 32 square that holds most of the figure, as a shift from (ox, oy), and one 16 x 16 piece for the rest"""
+    al = im.split()[3].load()
+    pts = [(x - ox, y - oy) for y in range(im.height) for x in range(im.width) if al[x, y] >= 128]
+    def best(v):
+        lo, hi = min(v), max(v)
+        return max(range(min(lo, hi - 31) - 1, max(lo, hi - 31) + 2), key=lambda s: (sum(s <= q < s + 32 for q in v), -abs(s)))
+    dx = best([p[0] for p in pts])
+    dy = best([p[1] for p in pts if dx <= p[0] < dx + 32])
+    main = im.crop((ox + dx, oy + dy, ox + dx + 32, oy + dy + 32))
+    cut = [(x, y) for x, y in pts if not (dx <= x < dx + 32 and dy <= y < dy + 32)]
+    extra = None; ex = ey = -128; kept = 0
+    if len(cut) >= 3:
+        wins = [(a_, b_) for a_ in {x - k for x, _ in cut for k in (0, 15)} for b_ in {y - k for _, y in cut for k in (0, 15)}]
+        inside = lambda w_: sum(w_[0] <= x < w_[0] + 16 and w_[1] <= y < w_[1] + 16 for x, y in cut)
+        ex, ey = max(sorted(wins), key=inside); kept = inside((ex, ey))
+        extra = im.crop((ox + ex, oy + ey, ox + ex + 16, oy + ey + 16))
+        ep = extra.load()
+        for y in range(16):
+            for x in range(16):
+                if dx <= ex + x < dx + 32 and dy <= ey + y < dy + 32: ep[x, y] = (0, 0, 0, 0)   # (the square has these)
+    assert all(-128 < v < 128 for v in (dx, dy)) and (extra is None or -128 < ex < 128)
+    return main, extra, (dx, dy, ex, ey), len(cut) - kept, len(pts)
+
+
 def load_char(name, folder=None):
     """the N64 game's sheets; folder: our own renders (tools/make_skeleton.mjs)"""
     hdr = open(os.path.join(folder or os.path.join(N64, 'src'), f'spr_{name}.h')).read()
@@ -96,7 +124,21 @@ def load_char(name, folder=None):
     w, h = round(W * SCALE), round(FH * SCALE)
     wx0 = (w - 32) // 2
     wy0 = round(AY * SCALE) - 30          # the feet on row 30
-    seq = []
+    seq = []; extras = []; metas = []; lost = total = 0
+    def unpremultiply(im):
+        px = im.load()
+        for y in range(im.height):
+            for x in range(im.width):
+                rr, gg, bb, aa = px[x, y]
+                if aa: px[x, y] = (min(255, rr * 255 // aa), min(255, gg * 255 // aa), min(255, bb * 255 // aa), aa)
+        return im
+    def sharpen(im):    # our skeleton: a little more contrast so bone and shadow part at this size
+        from PIL import ImageEnhance, ImageStat
+        al = im.split()[3]
+        mean = int(ImageStat.Stat(im.crop((wx0, wy0, wx0 + 32, wy0 + 32) if PLACED else (0, 0, 32, 32)).convert('L')).mean[0] + 0.5)
+        rgb = Image.blend(Image.new('RGB', im.size, (mean,) * 3), im.convert('RGB'), 1.2)
+        rgb = ImageEnhance.Brightness(rgb).enhance(0.86)
+        return Image.merge('RGBA', rgb.split() + (al,))
     for d in range(8):
         row = []
         for a, i in PICK:
@@ -104,36 +146,35 @@ def load_char(name, folder=None):
             r, g, b, al = f.split()
             z = Image.new('L', f.size, 0)
             pre = Image.merge('RGBA', (Image.composite(r, z, al), Image.composite(g, z, al), Image.composite(b, z, al), al))
-            sm = pre.resize((w, h), Image.BOX).crop((wx0, wy0, wx0 + 32, wy0 + 32))
-            px = sm.load()  # un-premultiply
-            for y in range(32):
-                for x in range(32):
-                    rr, gg, bb, aa = px[x, y]
-                    if aa: px[x, y] = (min(255, rr * 255 // aa), min(255, gg * 255 // aa), min(255, bb * 255 // aa), aa)
-            if folder:   # our skeleton: a little more contrast so bone and shadow part at this size
-                from PIL import ImageEnhance
-                al = sm.split()[3]
-                rgb = ImageEnhance.Brightness(ImageEnhance.Contrast(sm.convert('RGB')).enhance(1.2)).enhance(0.86)
-                sm = Image.merge('RGBA', rgb.split() + (al,))
+            sm = pre.resize((w, h), Image.BOX)
+            if not PLACED: sm = sm.crop((wx0, wy0, wx0 + 32, wy0 + 32))
+            sm = unpremultiply(sm)
+            if folder: sm = sharpen(sm)
+            if PLACED:
+                sm, extra, meta, n_lost, n_all = place_pose(sm, wx0, wy0)
+                extras.append(extra); metas.append(meta); lost += n_lost; total += n_all
             row.append(sm)
         seq.append(row)
-    cols, nearest = quantize([f for row in seq for f in row], 15)
+    cols, nearest = quantize([f for row in seq for f in row] + [e for e in extras if e], 15)
+    enc = lambda im: b''.join(enc_tile(t) for row in tiles_of(index_img(im, nearest)) for t in row)
     frames = []
     for d in range(8):
-        for f in seq[d]:
-            frames.append(b''.join(enc_tile(t) for row in tiles_of(index_img(f, nearest)) for t in row))
-    return frames, cols, seq
-
+        for k, f in enumerate(seq[d]):
+            extra = extras[d * len(PICK) + k] if PLACED else None
+            frames.append(enc(f) + (enc(extra) if extra else b''))
+    if PLACED:
+        print(f'{name}: {sum(1 for e in extras if e)} poses with an extra piece, {100 * lost / total:.2f} % of the figure still cut')
+    return frames, cols, seq, metas
 
 def pal16(cols, f=lambda c: c):
     return [0] + [bgr555(f(c)) for c in cols] + [0] * (15 - len(cols))
 
 
-hero, hero_cols, hero_seq = load_char('hx10')   # the hero with a sword (main.c: spr_hx<family><look>)
-ghoul, ghoul_cols, ghoul_seq = load_char('ghoul')
+hero, hero_cols, hero_seq, hero_meta = load_char('hx10')   # the hero with a sword (main.c: spr_hx<family><look>)
+ghoul, ghoul_cols, ghoul_seq, ghoul_meta = load_char('ghoul')
 SKEL = os.path.join(OUT, 'skel_src')
 assert os.path.exists(os.path.join(SKEL, 'spr_skel.h')), 'run: node tools/make_skeleton.mjs'
-skel, skel_cols, skel_seq = load_char('skel', SKEL)
+skel, skel_cols, skel_seq, skel_meta = load_char('skel', SKEL)
 
 def blue(c): return (int(c[0] * 0.55), int(c[1] * 0.7), min(255, int(c[2] * 1.2 + 60)))
 def red(c): return (min(255, int(c[0] * 0.6 + 110)), int(c[1] * 0.45), int(c[2] * 0.45))
@@ -694,6 +735,11 @@ lines += ['.bank 0', '.org $E000']
 for nm, ptrs in (('hero_ptrs', hp_), ('ghoul_ptrs', gp_), ('skel_ptrs', kp_)):
     lines.append(f'{nm}:')
     for k2 in range(0, len(ptrs), 8): lines.append(' .long ' + ', '.join(ptrs[k2:k2 + 8]))
+if PLACED:      # per frame: the square's shift, and the extra piece's (x = -128: none); ghouls, skeletons, the hero
+    lines.append(f'meta_base: .word 0, {len(ghoul_meta) * 4}, {(len(ghoul_meta) + len(skel_meta)) * 4}')
+    lines.append('fmeta:')
+    for m_ in (ghoul_meta, skel_meta, hero_meta):
+        for k2 in range(0, len(m_), 6): lines.append(' .byte ' + ', '.join(str(v & 0xFF) for q in m_[k2:k2 + 6] for v in q))
 pals = [pal16(hero_cols), pal16(ghoul_cols), pal16(skel_cols), pal16(ghoul_cols, blue), pal16(skel_cols, blue), pal16(hero_cols, red),
         [0] + [bgr555(c) for c in prop_cols], [0] + [bgr555(c) for c in small_cols]]
 lines.append('obj_pals:')

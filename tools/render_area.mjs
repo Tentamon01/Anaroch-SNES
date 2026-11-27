@@ -73,6 +73,8 @@ if (process.argv.includes('--moon')) {
   }
 }
 const SS = 2;
+const lin = (c) => Math.pow(c / 255, 2.2), srgb = (c) => Math.round(255 * Math.pow(Math.max(0, Math.min(1, c)), 1 / 2.2));
+
 const sx = (p) => p[0] * P.x[0] + p[2] * P.z[0], sy = (p) => p[0] * P.x[1] + p[2] * P.z[1] - p[1] * P.h;
 // the way to the viewer: the direction the projection cannot see, pointing upward
 let view = [0 * -P.h - P.z[0] * -P.h, P.z[0] * P.x[1] - P.x[0] * P.z[1], P.x[0] * -P.h - 0 * P.x[1]];
@@ -84,13 +86,11 @@ const minX = Math.floor(Math.min(...corners.map(sx)) / 8) * 8, maxX = Math.ceil(
 const minY = Math.floor((Math.min(...corners.map(sy)) - 6 * P.h) / 8) * 8, maxY = Math.ceil(Math.max(...corners.map(sy)) / 8) * 8;
 const W = maxX - minX, H = maxY - minY;
 fs.writeFileSync(path.join(out, `${area}_${proj}.json`), JSON.stringify({ minX, minY, W, H, ...P }));
-const lin = (c) => Math.pow(c / 255, 2.2), srgb = (c) => Math.round(255 * Math.pow(Math.max(0, Math.min(1, c)), 1 / 2.2));
-for (const layer of ['all', 'ground', 'objects']) {
+function raster(list, W, H, ox, oy, depthOut = null) {
+  const front = depthOut ? new Float32Array(W * SS * H * SS) : null;
   const w = W * SS, h = H * SS, col = new Float32Array(w * h * 3), zb = new Float32Array(w * h).fill(-Infinity), cov = new Uint8Array(w * h);
-  for (const t of tris) {
-    if (layer === 'ground' && !t.ground) continue;
-    if (layer === 'objects' && t.ground) continue;
-    const s = t.v.map((a) => ({ x: (sx(a.p) - minX) * SS, y: (sy(a.p) - minY) * SS, z: depth(a.p) }));
+  for (const t of list) {
+    const s = t.v.map((a) => ({ x: (sx(a.p) - minX - ox) * SS, y: (sy(a.p) - minY - oy) * SS, z: depth(a.p) }));
     const [a, b, c] = s;
     const area2 = (b.x - a.x) * (c.y - a.y) - (b.y - a.y) * (c.x - a.x);
     if (Math.abs(area2) < 1e-9) continue;
@@ -113,6 +113,10 @@ for (const layer of ['all', 'ground', 'objects']) {
         if (card && tex[i + 3] < 128) continue;
         texel = [lin(tex[i]), lin(tex[i + 1]), lin(tex[i + 2])];
       }
+      if (front) {                      // only what stands up from the floor, with where its foot is (screen depth)
+        if (t.v[0].p[1] * w0 + t.v[1].p[1] * w1 + t.v[2].p[1] * w2 < 0.35) continue;
+        front[o] = ((t.v[0].p[0] * w0 + t.v[1].p[0] * w1 + t.v[2].p[0] * w2 + 36) * 16 + (t.v[0].p[2] * w0 + t.v[1].p[2] * w1 + t.v[2].p[2] * w2 + 36) * 16) / 2;
+      }
       zb[o] = z; cov[o] = 1;
       for (let k = 0; k < 3; k++) col[o * 3 + k] = texel[k] * (t.v[0].c[k] * w0 + t.v[1].c[k] * w1 + t.v[2].c[k] * w2);
     }
@@ -121,8 +125,22 @@ for (const layer of ['all', 'ground', 'objects']) {
   for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
     let m = 0; const s = [0, 0, 0];
     for (let j = 0; j < SS; j++) for (let i = 0; i < SS; i++) { const o = (y * SS + j) * w + x * SS + i; if (cov[o]) { m++; for (let k = 0; k < 3; k++) s[k] += col[o * 3 + k]; } }
+    if (depthOut) { let d = 0, n_ = 0; for (let j = 0; j < SS; j++) for (let i = 0; i < SS; i++) { const o = (y * SS + j) * w + x * SS + i; if (cov[o]) { d += front[o]; n_++; } } depthOut[y * W + x] = n_ * 2 >= SS * SS ? Math.round(d / n_) : -32768; }
     if (m * 2 >= SS * SS) img.set([srgb(s[0] / m), srgb(s[1] / m), srgb(s[2] / m), 255], (y * W + x) * 4);
   }
+  return img;
+}
+// --front: what stands up from the floor, with its depth per pixel (for the walk-behind sprites)
+if (process.argv.includes('--front')) {
+  fs.mkdirSync(path.join(root, 'out', 'game'), { recursive: true });
+  const depthOut = new Int16Array(W * H);
+  writePNG(path.join(root, 'out', 'game', 'front.png'), W, H, raster(tris.filter((t) => !t.ground), W, H, 0, 0, depthOut));
+  fs.writeFileSync(path.join(root, 'out', 'game', 'front_depth.bin'), Buffer.from(depthOut.buffer));
+  console.log('front layer written');
+  process.exit(0);
+}
+for (const layer of ['all', 'ground', 'objects']) {
+  const img = raster(tris.filter((t) => layer === 'all' || (layer === 'ground' ? t.ground : !t.ground)), W, H, 0, 0);
   const file = path.join(out, `${area}_${proj}${flat ? '_flat' : ''}_${layer}.png`);
   writePNG(file, W, H, img);
   if (layer === 'all') fs.writeFileSync(path.join(out, `${area}_${proj}.json`), JSON.stringify({ minX, minY, W, H, ...P }));

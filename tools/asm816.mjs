@@ -291,7 +291,7 @@ export function assemble(mainFile, { banks = 8, defines = {} } = {}) {
         else if (v >= 0 && v < 0x100 && !/^[<>^]/.test(a) && tab.dp !== undefined) size = 'b';
         else if (v >= 0x10000 && (tab.long !== undefined)) size = 'l';
         else size = 'w';
-        if (n === 0 && e.unresolved) size = 'w';
+        if (n === 0 && e.unresolved && op !== 'JML' && op !== 'JSL') size = 'w';
         // keep stable: direct page only when resolved <$100
       }
       if (size === 'b') { pick('dp' + idx, v, 1); }

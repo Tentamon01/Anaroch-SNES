@@ -87,6 +87,8 @@ export class Snes {
       case 0x211B: case 0x211C: case 0x211D: case 0x211E: case 0x211F: case 0x2120: this.m7[a] = (v << 8) | this.m7latch; this.m7latch = v; break;
       case 0x210D: this.m7[a] = (v << 8) | this.m7latch; this.m7latch = v; this.scroll.h = (v << 8) | (this.scroll.prev & ~7) | ((this.scroll.h >> 8) & 7); this.scroll.prev = v; break;
       case 0x210E: this.m7[a] = (v << 8) | this.m7latch; this.m7latch = v; this.scroll.v = (v << 8) | this.scroll.prev; this.scroll.prev = v; break;
+      case 0x2111: { const q = this.scroll3 || (this.scroll3 = { h: 0, v: 0 }); q.h = (v << 8) | (this.scroll.prev & ~7) | ((q.h >> 8) & 7); this.scroll.prev = v; break; }
+      case 0x2112: { const q = this.scroll3 || (this.scroll3 = { h: 0, v: 0 }); q.v = (v << 8) | this.scroll.prev; this.scroll.prev = v; break; }
       case 0x2116: this.vaddr = (this.vaddr & 0xFF00) | v; break;
       case 0x2117: this.vaddr = (this.vaddr & 0xFF) | (v << 8); break;
       case 0x2118: case 0x2119: {
@@ -162,7 +164,8 @@ export class Snes {
   }
   step() {
     const pc0 = (this.PB << 16) | this.PC;
-    if (this.breaks.has(pc0)) this.breaks.get(pc0)(this);
+    const hit = this.breaks.get(pc0) || this.breaks.get(pc0 & 0x7FFFFF);
+    if (hit) hit(this);
     const opc = this.fetch(); const { mn, mode } = OP[opc];
     if (this.trace) this.trace(pc0, mn, mode);
     this.cyc += 3;
@@ -295,6 +298,9 @@ export class Snes {
     this.nmiFlag = 1;
     if (this.reg[0x4200] & 0x80) this.nmi();
     let irqDone = !(this.reg[0x4200] & 0x20);
+    const irqLine = this.reg[0x4209] | (this.reg[0x420A] << 8);
+    // an interrupt near the bottom of the picture is where a frame of this emulator starts (it renders at the end)
+    if (!irqDone && irqLine >= 200) { irqDone = true; this.irqFlag = 0x80; if (!(this.P & 4)) { this.push(this.PB); this.push16(this.PC); this.push(this.P); this.P |= 0x04; this.P &= ~0x08; this.PB = 0; this.PC = this.rd16(0xFFEE); } }
     while (this.cyc < budget && !this.halted) {
       this.step();
       if (this.sfx && this.sfx.running) for (let i = 0; i < 6 && this.sfx.running; i++) this.sfx.step();
@@ -385,10 +391,18 @@ export class Snes {
         const v = this.tilePx(c2, e & 0x3FF, x & 7, py & 7);
         if (v) { b2 = ((e >> 10) & 7) * 16 + v; b2hi = !!(e & 0x2000); }
       }
-      if (b2 && !b2hi) ci = b2;
-      if ((tm & 0x10) && spr[y * W + x] >= 0) ci = spr[y * W + x];
-      if (b2 && b2hi) ci = b2;
+      let math = ci ? this.reg[0x2131] & 1 : 0;             // which layer is on top decides whether BG3 is added
+      if (b2 && !b2hi) { ci = b2; math = 0; }
+      if ((tm & 0x10) && spr[y * W + x] >= 0) { ci = spr[y * W + x]; math = ci >= 192 ? this.reg[0x2131] & 0x10 : 0; }
+      if (b2 && b2hi) { ci = b2; math = 0; }
       let [r, g, b] = this.color(ci);
+      if (math && mode === 1 && (this.reg[0x2130] & 2) && (this.reg[0x212D] & 4)) {    // add the second screen: BG3, 64x32
+        const q = this.scroll3 || { h: 0, v: 0 }, px = (x + (q.h & 0x3FF)) & 511, py = (y + (q.v & 0x3FF)) & 255;
+        const mb = (((this.reg[0x2109] & 0xFC) << 9) + (((py >> 3) * 32 + ((px >> 3) & 31)) + (px >= 256 ? 0x400 : 0)) * 2) & 0xFFFF;
+        const e = this.vram[mb] | (this.vram[mb + 1] << 8), o = (((this.reg[0x210C] & 0xF) << 13) + (e & 0x3FF) * 16 + (py & 7) * 2) & 0xFFFF, sh = 7 - (px & 7);
+        const v = ((this.vram[o] >> sh) & 1) | (((this.vram[o + 1] >> sh) & 1) << 1);
+        if (v) { const [ar, ag, ab] = this.color(((e >> 10) & 7) * 4 + v); r = Math.min(248, r + ar); g = Math.min(248, g + ag); b = Math.min(248, b + ab); }
+      }
       if (blank) r = g = b = 0; else if (bright < 15) { r = r * (bright + 1) >> 4; g = g * (bright + 1) >> 4; b = b * (bright + 1) >> 4; }
       out.set([r, g, b], (y * W + x) * 3);
       }

@@ -40,7 +40,8 @@ SNES would draw.
 - **Light:** each face has one shade of moonlight. The braziers' glow is a dithered 3-colour layer added by colour
   math, not part of the tiles.
 - **Palettes:** the world uses 6 (the HUD and glow layer shares the other two), one of them kept for flames.
-- **Background 3** carries both the glow (play area) and the HUD (bottom lines), switched part-way down the screen.
+- **Background 3** carries the glow. (Changed in step 1: the HUD stays on background 2, and walls, trees and graves
+  in front of a character are redrawn as sprites, which needs far fewer tiles than a front layer.)
 
 **Character size (decided):** 32x32, true to the world's scale (A in the picture). The tallest poses, such as the
 overhead sword swing, reach about 38 pixels and get a small extra sprite piece instead of being clipped.
@@ -76,10 +77,10 @@ Pictures like these packed to about 79 % in the test, so little extra room is co
 
 | Part | Use |
 |---|---|
-| Background 1 | Ground and what stands behind characters (6 palettes) |
-| Background 2 | What stands in front of them: wall tops, tree crowns, gates |
-| Background 3 | The braziers' glow, and the HUD and words in the bottom lines |
-| Sprites | Hero, mercenary, up to 8 monsters, loot, arrows, small effects |
+| Background 1 | The whole world picture (6 palettes) |
+| Background 2 | The HUD and words |
+| Background 3 | The braziers' glow, added by colour math |
+| Sprites | Hero, mercenary, up to 8 monsters, loot, arrows, small effects, and what stands in front of a character |
 | SuperFX | Drawn into sprite memory: bosses, large spells, scaled and lit effects, 20-30 times a second |
 
 Limits to design around: 128 sprites, at most 8 characters 32 pixels wide on one line, 16 KB of sprite tiles and
@@ -118,7 +119,7 @@ Each step ends in a ROM you can run, and the next starts after you have seen it.
 
 **0. Foundations.** Done, see the results above.
 
-**1. The graveyard, finished look**
+**1. The graveyard, finished look.** Done, approved 2026-11-27.
 - Scrolling world with things in front of and behind the characters, new hero and monster pictures.
 - Walking, fighting, loot, HUD at 60 FPS with 8 monsters.
 - Its music and the first sound effects.

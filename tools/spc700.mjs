@@ -116,7 +116,8 @@ export function brrEncode(samples, loopAt = -1) {
 // ---------------------------------------------------------------- the preview player
 const RATES = [Infinity, 2048, 1536, 1280, 1024, 768, 640, 512, 384, 320, 256, 192, 160, 128, 96, 80, 64, 48, 40, 32, 24, 20, 16, 12, 10, 8, 6, 5, 4, 3, 2, 1];
 
-export function renderSpc(image, loadAt, entry, seconds) {
+export function renderSpc(image, loadAt, entry, seconds, inputs = []) {      // inputs: [seconds, port, value] from the SNES
+  const fromCpu = [0, 0, 0, 0]; let nextIn = 0;
   const ram = new Uint8Array(0x10000); ram.set(image, loadAt);
   const dsp = new Uint8Array(128); dsp[0x6c] = 0xe0;
   const ports = [0, 0, 0, 0]; let dspAddr = 0, control = 0, t0target = 0, t0count = 0, t0out = 0, t0acc = 0;
@@ -125,13 +126,13 @@ export function renderSpc(image, loadAt, entry, seconds) {
   const rd = (a) => {
     a &= 0xffff;
     if (a === 0xf2) return dspAddr; if (a === 0xf3) return dsp[dspAddr & 127];
-    if (a >= 0xf4 && a <= 0xf7) return 0;
+    if (a >= 0xf4 && a <= 0xf7) return fromCpu[a - 0xf4];
     if (a === 0xfd) { const v = t0out & 15; t0out = 0; return v; }
     return ram[a];
   };
   const wr = (a, v) => {
     a &= 0xffff; v &= 255;
-    if (a === 0xf1) { if ((v & 1) && !(control & 1)) { t0count = 0; t0out = 0; } control = v; return; }
+    if (a === 0xf1) { if ((v & 1) && !(control & 1)) { t0count = 0; t0out = 0; } if (v & 0x10) fromCpu[0] = fromCpu[1] = 0; if (v & 0x20) fromCpu[2] = fromCpu[3] = 0; control = v; return; }
     if (a === 0xf2) { dspAddr = v; return; }
     if (a === 0xf3) { if (dspAddr < 128) { dsp[dspAddr] = v; if (dspAddr === 0x4c) for (let i = 0; i < 8; i++) if (v & (1 << i)) keyOn(i); if (dspAddr === 0x7c) dsp[0x7c] = 0; } return; }
     if (a >= 0xf4 && a <= 0xf7) { ports[a - 0xf4] = v; return; }
@@ -183,6 +184,7 @@ export function renderSpc(image, loadAt, entry, seconds) {
   const total = Math.floor(seconds * 32000), out = new Int16Array(total * 2);
   const clamp = (v) => Math.max(-32768, Math.min(32767, v));
   for (let s = 0; s < total; s++) {
+    while (nextIn < inputs.length && inputs[nextIn][0] * 32000 <= s) { fromCpu[inputs[nextIn][1]] = inputs[nextIn][2]; nextIn++; }
     for (let k = 0; k < 10; k++) step();
     if (control & 1) { t0acc += 8000; while (t0acc >= 32000) { t0acc -= 32000; t0count = (t0count + 1) & 255; if (t0count === (t0target & 255)) { t0count = 0; t0out++; } } }
     const nr = RATES[dsp[0x6c] & 31];
