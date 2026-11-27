@@ -1,0 +1,14 @@
+board: ANAROCH-DUAL
+  processor architecture=GSU
+    map address=00-3f,80-bf:3000-34ff
+    memory type=ROM content=Program
+      map address=00-3f,80-bf:8000-ffff mask=0x8000
+    memory type=RAM content=Save
+      map address=70-71:0000-ffff
+  processor identifier=SPC7110
+    map address=00-3f,80-bf:4800-483f
+    map address=50,58:0000-ffff
+    mcu
+      map address=c0-ff:0000-ffff mask=0xc00000
+      memory type=ROM content=Program
+      memory type=ROM content=Data

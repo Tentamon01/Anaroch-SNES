@@ -1,0 +1,8 @@
+# generated files, ROMs and saves
+out/
+src/data.inc
+*.sfc
+*.ram
+
+# local copy of ares with the dual-chip board (binaries)
+ares_dual/
