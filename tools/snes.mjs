@@ -3,6 +3,7 @@
 // budget of CPU cycles (estimated per instruction), then NMI.
 import fs from 'node:fs';
 import { T, IMP, REL, RELL } from './asm816.mjs';
+import { Spc7110, SuperFx } from './chips.mjs';
 
 // ---- opcode table from the assembler's tables
 const OP = new Array(256);
@@ -21,7 +22,13 @@ OP[0x54] = { mn: 'MVN', mode: 'mvn' }; OP[0x44] = { mn: 'MVP', mode: 'mvn' };
 for (let i = 0; i < 256; i++) if (!OP[i]) OP[i] = { mn: 'NOP', mode: 'imp' };
 
 export class Snes {
-  constructor(rom) {
+  // options.program: the size of the program ROM on the dual-chip board (the rest is the SPC7110's data ROM)
+  constructor(rom, options = {}) {
+    const program = options.program || 0;
+    this.sfx = program ? new SuperFx(rom.subarray(0, program)) : null;
+    this.spc = program ? new Spc7110(rom.subarray(0, program), rom.subarray(program)) : null;
+    this.apu = [0xAA, 0xBB, 0, 0]; this.irqFlag = 0;
+    if (program) rom = rom.subarray(0, program);
     this.rom = rom; this.wram = new Uint8Array(0x20000); this.vram = new Uint8Array(0x10000); this.cgram = new Uint8Array(512);
     this.oam = new Uint8Array(544); this.reg = new Uint8Array(0x10000); this.pad = 0; this.frame = 0; this.nmiFlag = 0;
     this.vaddr = 0; this.cgaddr = 0; this.cglatch = null; this.oamaddr = 0; this.scroll = { h: 0, v: 0, hl: 0, vl: 0, prev: 0 };
@@ -34,6 +41,18 @@ export class Snes {
   rd(addr) {
     addr &= 0xFFFFFF; const b = addr >> 16, a = addr & 0xFFFF;
     if (b === 0x7E || b === 0x7F) return this.wram[addr - 0x7E0000];
+    if (this.sfx) {
+      if (b >= 0xC0) return this.spc.mcu(addr);
+      if (b === 0x50) return this.spc.read(0);
+      if (b === 0x70 || b === 0x71) return this.sfx.ran ? 0 : this.sfx.ram[addr - 0x700000];
+      if ((b & 0x7F) < 0x40) {
+        if (a >= 0x3000 && a < 0x3500) return this.sfx.ioRead(a);
+        if (a >= 0x4800 && a < 0x4840) return this.spc.read(a);
+        if (a >= 0x8000 && this.sfx.ron) return [0x00, 0x01, 0x00, 0x01, 0x04, 0x01, 0x00, 0x01, 0x00, 0x01, 0x08, 0x01, 0x00, 0x01, 0x0C, 0x01][a & 15];
+        if (a >= 0x2140 && a <= 0x2143) return this.apu[a - 0x2140];
+        if (a === 0x4211) { const v = this.irqFlag; this.irqFlag = 0; return v; }
+      }
+    }
     if ((b & 0x7F) < 0x40) {
       if (a < 0x2000) return this.wram[a];
       if (a >= 0x8000) return this.romAt(b, a);
@@ -50,6 +69,14 @@ export class Snes {
   wr(addr, v) {
     addr &= 0xFFFFFF; v &= 0xFF; const b = addr >> 16, a = addr & 0xFFFF;
     if (b === 0x7E || b === 0x7F) { this.wram[addr - 0x7E0000] = v; return; }
+    if (this.sfx) {
+      if (b === 0x70 || b === 0x71) { if (!this.sfx.ran) this.sfx.ram[addr - 0x700000] = v; return; }
+      if ((b & 0x7F) < 0x40) {
+        if (a >= 0x3000 && a < 0x3500) return this.sfx.ioWrite(a, v);
+        if (a >= 0x4800 && a < 0x4840) return this.spc.write(a, v);
+        if (a >= 0x2140 && a <= 0x2143) { this.apu[a - 0x2140] = v; return; }
+      }
+    }
     if ((b & 0x7F) >= 0x40 || a >= 0x8000) return;
     if (a < 0x2000) { this.wram[a] = v; return; }
     this.reg[a] = v;
@@ -267,7 +294,15 @@ export class Snes {
     this.cyc = 0;
     this.nmiFlag = 1;
     if (this.reg[0x4200] & 0x80) this.nmi();
-    while (this.cyc < budget && !this.halted) this.step();
+    let irqDone = !(this.reg[0x4200] & 0x20);
+    while (this.cyc < budget && !this.halted) {
+      this.step();
+      if (this.sfx && this.sfx.running) for (let i = 0; i < 6 && this.sfx.running; i++) this.sfx.step();
+      if (!irqDone && this.cyc > budget * ((((this.reg[0x4209] | (this.reg[0x420A] << 8)) + 38) % 262) / 262)) {
+        irqDone = true; this.irqFlag = 0x80;
+        if (!(this.P & 4)) { this.push(this.PB); this.push16(this.PC); this.push(this.P); this.P |= 0x04; this.P &= ~0x08; this.PB = 0; this.PC = this.rd16(0xFFEE); }
+      }
+    }
     this.frame++;
   }
   // ---- rendering: Mode 1, BG1 (4bpp) + sprites

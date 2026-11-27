@@ -81,6 +81,16 @@ about 61 s, looping), and renders a preview to `out/audio/song_preview.wav` with
 `tools/spc700.mjs` (an approximation; ares is the reference). About 15 KB of the sound chip's 64 KB are used,
 plus 16 KB of echo. No sound effects yet, and the game itself does not play it yet.
 
+## The remake: step 0
+The plan and the results are in `docs/REMAKE_PLAN.md`.
+
+    node tools/build_step0.mjs && node tools/test_step0.mjs   # code from the SPC7110 window while the SuperFX works
+    node tools/test_chips.mjs                                  # the chip test in the test emulator (tools/chips.mjs)
+    node tools/make_area_unlit.mjs                             # the N64 graveyard without baked light
+    node tools/render_area.mjs gymoon t1 --from=out/step0/graveyard_unlit.glb --flat --moon --exposure=1.9
+    python tools/tile_budget.py gymoon_t1_flat_all --exact     # tiles and palettes against the SNES's limits
+    python tools/mockup.py                                     # the new look, as a picture
+
 ## The skeleton
 `node tools/make_skeleton.mjs` builds an anatomical skeleton on the hero rig and renders it with a patched copy of the
 N64 sprite renderer (the N64 project is only read) into `out/skel_src/`; the ribcage is drawn in one-pixel rows at

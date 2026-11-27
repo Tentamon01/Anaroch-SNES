@@ -13,12 +13,11 @@ const EV = [ // probability of the likelier symbol, next state after {likely, un
 const moveToFront = (list, v) => { const i = list.indexOf(v); if (i > 0) { list.splice(i, 1); list.unshift(v); } };
 
 // The pixel model shared by both directions. symbol(lpsOffset) decides each binary symbol (0 = the likelier one).
-function model(bpp, nPixels, symbol, wanted) {
+function* model(bpp, nPixels, symbol, wanted) {
   const ctx = Array.from({ length: 5 }, () => Array.from({ length: 15 }, () => ({ p: 0, swap: 0 })));
   let range = 0x100, output = 0;
   const history = new Array(16).fill(0);                 // the pixels so far, newest first
   const colormap = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15];
-  const result = [];
   for (let n = 0; n < nPixels; n++) {
     let diff = 0, map = colormap.slice();
     if (bpp > 1) {
@@ -60,9 +59,8 @@ function model(bpp, nPixels, symbol, wanted) {
     if (bpp === 1) index ^= history[15] & 1;
     const pixel = bpp === 1 ? index : map[index];
     history.pop(); history.unshift(pixel);
-    result.push(pixel);
+    yield pixel;
   }
-  return result;
 }
 
 /** pixels (left to right, 8 per tile row, tile after tile) -> the packed stream */
@@ -73,7 +71,7 @@ export function packPixels(pixels, bpp) {
     return want;
   };
   symbol.shift = () => { low <<= 1n; shifts++; };
-  model(bpp, pixels.length, symbol, pixels);
+  for (const _ of model(bpp, pixels.length, symbol, pixels)) { /* (run the whole model) */ }
   // the stream's first 16 bits are the starting number; each shift takes one more bit
   const totalBits = 16 + shifts, pad = (8 - (totalBits % 8)) % 8;
   const value = low << BigInt(pad), bytes = (totalBits + pad) / 8;
@@ -83,12 +81,30 @@ export function packPixels(pixels, bpp) {
   return out;
 }
 
-/** the chip's side, to check the packer */
-export function unpackPixels(stream, bpp, nPixels) {
-  let at = 2, bits = 8, input = (stream[0] << 8) | stream[1];
+// the chip's side of the coder over any byte source
+function decoder(byteAt) {
+  let at = 2, bits = 8, input = (byteAt(0) << 8) | byteAt(1);
   const symbol = (lps) => { const s = input >= (lps << 8) ? 1 : 0; if (s) input -= lps << 8; return s; };
-  symbol.shift = () => { input = (input << 1) & 0xffff; if (--bits === 0) { bits = 8; input = (input + (stream[at++] || 0)) & 0xffff; } };
-  return model(bpp, nPixels, symbol, null);
+  symbol.shift = () => { input = (input << 1) & 0xffff; if (--bits === 0) { bits = 8; input = (input + (byteAt(at++) || 0)) & 0xffff; } };
+  return symbol;
+}
+/** the chip's side, to check the packer */
+export const unpackPixels = (stream, bpp, nPixels) => Array.from(model(bpp, nPixels, decoder((i) => stream[i] || 0), null));
+/** the unpacked bytes one at a time, as the chip's port gives them (4bpp: SNES tiles) */
+export function unpackStream(byteAt, bpp) {
+  if (bpp !== 4) throw new Error('only 4 bits a pixel here');
+  const pixels = model(bpp, Infinity, decoder(byteAt), null);
+  let tile = null, at = 32;
+  return () => {
+    if (at === 32) {
+      tile = new Uint8Array(32); at = 0;
+      for (let y = 0; y < 8; y++) for (let x = 0; x < 8; x++) {
+        const v = pixels.next().value, bit = 0x80 >> x;
+        if (v & 8) tile[y * 2] |= bit; if (v & 4) tile[y * 2 + 1] |= bit; if (v & 2) tile[16 + y * 2] |= bit; if (v & 1) tile[17 + y * 2] |= bit;
+      }
+    }
+    return tile[at++];
+  };
 }
 
 /** SNES 4bpp tiles (32 bytes each) <-> the pixel order the chip codes them in */
