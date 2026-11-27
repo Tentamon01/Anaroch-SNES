@@ -60,6 +60,27 @@ So far `src/dual_test.asm` proves both chips work together: the SPC7110 data por
 and a GSU program runs from SuperFX RAM while the CPU keeps going. The game itself is not on this board yet.
 The Mode 7 camera was dropped (its code is still in `src/main.asm` under `.if MODE7`, no longer built).
 
+## Chip test (SuperFX 2 + SPC7110 + sound)
+`out/anaroch_chiptest.sfc` runs everything at once on the dual-chip board. Measured in `ares_dual` over about
+74 seconds (4419 frames): no dropped frames; the SPC7110 unpacked a 28 KB picture at boot with no wrong byte and
+kept unpacking and checking it while running (78 passes, none bad); the SuperFX drew six scaled characters from
+cartridge ROM into a 128x128 window about 25 times a second while the CPU ran from WRAM; the music played.
+
+    python tools/build_assets.py && python tools/build_chip_assets.py
+    node tools/build_audio.mjs && node tools/build_chip.mjs
+    ares_dual/ares.exe --system "Super Famicom" --no-file-prompt out/anaroch_chiptest.sfc
+
+- `tools/spc7110.mjs`: packs graphics for the SPC7110's decompressor (and unpacks, to check).
+- `tools/gsuasm.mjs`, `src/gsu_test.s`: a SuperFX assembler and the scaling program.
+- `src/chip_test.asm`: the test itself.
+
+## Sound
+`src/spc_driver.s` is the sound chip's driver (an event stream: keys, volumes, DSP writes, loop);
+`tools/build_audio.mjs` synthesises every instrument, writes the graveyard track "Ashes Under the Yew" (original,
+about 61 s, looping), and renders a preview to `out/audio/song_preview.wav` with the small player in
+`tools/spc700.mjs` (an approximation; ares is the reference). About 15 KB of the sound chip's 64 KB are used,
+plus 16 KB of echo. No sound effects yet, and the game itself does not play it yet.
+
 ## The skeleton
 `node tools/make_skeleton.mjs` builds an anatomical skeleton on the hero rig and renders it with a patched copy of the
 N64 sprite renderer (the N64 project is only read) into `out/skel_src/`; the ribcage is drawn in one-pixel rows at

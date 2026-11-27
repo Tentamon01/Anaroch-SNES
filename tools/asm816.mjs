@@ -150,7 +150,7 @@ export function assemble(mainFile, { banks = 8, defines = {} } = {}) {
       if (t[0] === "'") return t.charCodeAt(1);
       let name = t;
       if (name[0] === '@') name = lastGlobal + name;
-      if (name === '*') return cur.pc;
+      if (name === '*') return cur.pc + cur.delta;
       if (name in syms) return syms[name];
       if (name in prevSyms) { unresolved = true; return prevSyms[name]; }
       if (pass > 0) err(l, 'undefined symbol ' + name);
@@ -167,11 +167,11 @@ export function assemble(mainFile, { banks = 8, defines = {} } = {}) {
     return { v, unresolved };
   };
 
-  const cur = { pc: 0, bank: 0, ram: false, a16: false, x16: false };
+  const cur = { pc: 0, bank: 0, ram: false, a16: false, x16: false, delta: 0 };   // delta: .phase (code that runs elsewhere)
   let outSize = 0;
 
   const pass = (n) => {
-    lastGlobal = ''; cur.pc = 0x8000; cur.bank = 0; cur.ram = false; cur.a16 = false; cur.x16 = false;
+    lastGlobal = ''; cur.delta = 0; cur.pc = 0x8000; cur.bank = 0; cur.ram = false; cur.a16 = false; cur.x16 = false;
     const newSyms = { ...defines };
     const conds = [];   // .if / .else / .endif: { active, parent }
     const emitB = (l, b) => {
@@ -200,7 +200,7 @@ export function assemble(mainFile, { banks = 8, defines = {} } = {}) {
       if (m && !/^\s*\./.test(t)) {
         let name = m[1];
         if (name[0] !== '@') lastGlobal = name; else name = lastGlobal + name;
-        const addr = cur.ram ? cur.pc : ((cur.bank << 16) | cur.pc);
+        const addr = cur.ram ? cur.pc : cur.delta ? (cur.pc + cur.delta) & 0xFFFF : ((cur.bank << 16) | cur.pc);
         if (name in newSyms) err(l, 'duplicate label ' + name);
         newSyms[name] = addr;
         t = m[2];
@@ -218,6 +218,8 @@ export function assemble(mainFile, { banks = 8, defines = {} } = {}) {
         switch (mn) {
           case '.BANK': cur.bank = ev(arg).v; cur.pc = 0x8000; cur.ram = false; break;
           case '.ORG': cur.pc = ev(arg).v; break;
+          case '.PHASE': cur.delta = ev(arg).v - cur.pc; break;
+          case '.DEPHASE': cur.delta = 0; break;
           case '.RAM': cur.ram = true; cur.pc = ev(arg).v; break;
           case '.A8': cur.a16 = false; break;
           case '.A16': cur.a16 = true; break;
@@ -240,7 +242,7 @@ export function assemble(mainFile, { banks = 8, defines = {} } = {}) {
       if (op in REL || op in RELL) {
         const tgt = ev(arg);
         const isL = op in RELL;
-        const base = cur.pc + (isL ? 3 : 2);
+        const base = cur.pc + cur.delta + (isL ? 3 : 2);
         const d = (tgt.v & 0xFFFF) - base;
         if (isL) { emitB(l, RELL[op]); E(d, 2); }
         else { if (n > 0 && (d < -128 || d > 127)) err(l, `branch out of range (${d})`); emitB(l, REL[op]); E(d, 1); }
