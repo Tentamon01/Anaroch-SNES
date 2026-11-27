@@ -21,6 +21,7 @@ const EXPOSURE = +((process.argv.find((a) => a.startsWith('--exposure=')) || '--
 // pixels per metre on screen: x axis, z axis, height
 export const PROJ = {
   t1: { x: [16, 8], z: [-8, 8], h: 12 },
+  big: { x: [24, 12], z: [-12, 12], h: 18 },        // t1 with everything half as big again (metres repeat on tiles in twos)
   t2: { x: [16, 8], z: [-8, 16], h: 11 },
   iso: { x: [16, 8], z: [-16, 8], h: 14 },
   straight: { x: [16, 0], z: [0, 16], h: 12 },

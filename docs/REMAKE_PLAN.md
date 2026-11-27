@@ -42,7 +42,12 @@ SNES would draw.
 - **Palettes:** the world uses 6 (the HUD and glow layer shares the other two), one of them kept for flames.
 - **Background 3** carries both the glow (play area) and the HUD (bottom lines), switched part-way down the screen.
 
-Still open: the size of the characters (A or B in the picture), to be chosen before step 1.
+**Character size (decided):** 32x32, true to the world's scale (A in the picture). The tallest poses, such as the
+overhead sword swing, reach about 38 pixels and get a small extra sprite piece instead of being clipped.
+Characters a third bigger would not match the graves; everything 1.5 times bigger was tried too (the busiest screen
+still fits, at 532 tiles) but shows less than half as much and puts the character art over its budget.
+
+![32x32 against everything 1.5 times bigger](step0_sizes.png)
 
 ## The world
 

@@ -6,8 +6,10 @@ from PIL import Image, ImageEnhance, ImageDraw
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 N64 = os.path.join(os.path.dirname(ROOT), 'Anaroch_N64_Sprite')
 S0 = os.path.join(ROOT, 'out', 'step0')
-P = json.load(open(os.path.join(S0, 'gymoon_t1.json')))
-world = Image.open(os.path.join(S0, 'gymoon_t1_flat_all_pal.png')).convert('RGB')
+import sys
+PROJ = sys.argv[1] if len(sys.argv) > 1 else 't1'
+P = json.load(open(os.path.join(S0, f'gymoon_{PROJ}.json')))
+world = Image.open(os.path.join(S0, f'gymoon_{PROJ}_flat_all_pal.png')).convert('RGB')
 src = open(os.path.join(N64, 'src', 'area_graveyard.h')).read()
 lights = [(float(a), float(b)) for a, _, b in re.findall(r'\{(-?[\d.]+)f, (-?[\d.]+)f, (-?[\d.]+)f\}', src.split('gy_lights')[1].split('gy_spawns')[0])]
 to_px = lambda x, z: (x * P['x'][0] + z * P['z'][0] - P['minX'], x * P['x'][1] + z * P['z'][1] - P['minY'])
@@ -23,8 +25,8 @@ lit = world.copy(); lp = lit.load()
 glow = [0.0] * (world.width * world.height)
 for lx, lz in lights:
     cx, cy = to_px(lx, lz)
-    for y in range(max(0, int(cy) - 60), min(world.height, int(cy) + 60)):
-        for x in range(max(0, int(cx) - 80), min(world.width, int(cx) + 80)):
+    for y in range(max(0, int(cy) - 90), min(world.height, int(cy) + 90)):
+        for x in range(max(0, int(cx) - 120), min(world.width, int(cx) + 120)):
             gx, gz = ground(x, y)
             d_ = math.hypot(gx - lx, gz - lz)
             if d_ < 4.2: glow[y * world.width + x] = max(glow[y * world.width + x], 3.2 * (1 - d_ / 4.2) ** 1.1)
@@ -78,6 +80,9 @@ def screen(ppm_out, label):
     r, g, bl, _ = im.split()
     return Image.merge('RGB', [ch.point(lambda v: v & 248) for ch in (r, g, bl)])
 
+if PROJ != 't1':                       # one screen of the other size
+    screen(round(18 * P['x'][0] / 16), PROJ).resize((512, 448), Image.NEAREST).save(os.path.join(S0, f'mockup_{PROJ}.png'))
+    print(f'wrote out/step0/mockup_{PROJ}.png'); sys.exit(0)
 a1, a2 = screen(18, 'small'), screen(24, 'tall')
 out = Image.new('RGB', (1048, 448), (200, 0, 200))
 out.paste(a1.resize((512, 448), Image.NEAREST), (0, 0)); out.paste(a2.resize((512, 448), Image.NEAREST), (536, 0))
