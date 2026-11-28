@@ -34,6 +34,26 @@ FarDrop:
  jsr DropAt
  rtl
 
+FarHurt:                     ; X = the monster: hurt by hdmg from (hfx, hfy)
+ jsr HurtActor
+ rtl
+FarDot:                      ; (tmp0, tmp2) along direction Y/2 -> A, ten to a pixel
+ jsr DotDir
+ cmp #0
+ rtl
+FarFoot:                     ; (tmpF, tmpG): carry set when the hero could not stand there
+ jsr CheckFoot
+ rtl
+FarMove:
+ jsr MoveEnt
+ rtl
+FarDirFrom:                  ; a world movement (tmp0, tmp2) -> A = the screen direction it shows as
+ jsr Rot
+ jsr DirFrom
+ rtl
+FarBlocked:
+ jsr Blocked
+ rtl
 FarStatsOpen:
  jsr StatsOpen
  rtl
@@ -166,6 +186,7 @@ FarRestoreVideo:
  lda #1
  sta rebuild
  sta hudflag
+ sta skDirty
  lda #$FFFF
  sta nearshown
  stz sayt

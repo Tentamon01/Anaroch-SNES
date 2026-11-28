@@ -14,6 +14,7 @@ ShootArrow:
 @got:
  lda #0
  sta.w aown,y
+ sta.w akind,y
  sty tmpB
  jsr RelHero
  lda tmp4
@@ -83,6 +84,13 @@ UpdateArrows:
  bne @on
  jmp @n
 @on:
+ ldy.w aown,x
+ beq @enemy
+ phx
+ jsl $800000+X_HeroArrow
+ plx
+ jmp @n
+@enemy:
  dec a
  sta.w alife,x
  bne @fly0
@@ -105,11 +113,6 @@ UpdateArrows:
  stz.w alife,x
  bra @n
 @fly:
- lda.w aown,x
- beq @theirs
- jsr HeroArrow
- jmp @n
-@theirs:
  lda.w est
  cmp #ST_DEAD
  bcs @n
@@ -156,87 +159,3 @@ UpdateArrows:
  jmp @l
 @end:
  rts
-
-; the hero's arrow at X (tmp6 / tmp7 = its place): the first live monster it touches
-HeroArrow:
- .a16
- .i16
- ldy #2
-@m:
- lda.w est,y
- cmp #ST_DEAD
- bcs @next
- lda.w ex,y
- lsr4
- sec
- sbc tmp6
- jsr Abs16
- cmp #8
- bcs @next
- lda.w ey,y
- lsr4
- sec
- sbc tmp7
- jsr Abs16
- cmp #8
- bcs @next
- stz.w alife,x
- lda.w ax,x
- sec
- sbc.w avx,x
- lsr4
- sta hfx
- lda.w ay,x
- sec
- sbc.w avy,x
- lsr4
- sta hfy
- phx
- tyx
- jsl $800000+X_HeroBlow
- jsr HurtActor
- plx
- rts
-@next:
- iny
- iny
- cpy #NACT*2
- bne @m
- rts
-
-; the bow: an arrow the way the hero faces, four times his walking speed, as far as the bow reaches
-ShootHero:
- .a16
- .i16
- ldy #0
-@f:
- lda.w alife,y
- beq @got
- iny
- iny
- cpy #NARROW*2
- bne @f
- rts
-@got:
- lda #37
- sta.w alife,y
- lda #1
- sta.w aown,y
- lda.w ex
- sta.w ax,y
- lda.w ey
- sta.w ay,y
- lda.w edir
- sta.w adir,y
- asl
- tax
- lda.w hspd,x
- asl
- asl
- sta.w avx,y
- lda.w hspd+16,x
- asl
- asl
- sta.w avy,y
- lda #SFX_BOW
- jmp Sfx

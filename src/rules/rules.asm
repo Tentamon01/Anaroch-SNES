@@ -9,6 +9,8 @@
 .include "names.asm"
 .include "play.asm"
 .include "bag.asm"
+.include "skills.asm"
+.include "skillui.asm"
 
 X_NewKit:      jsr NewKit
  rtl
@@ -20,7 +22,29 @@ X_KillXp:      jsr KillXp
  rtl
 X_GainXp:      jsr GainXp
  rtl
-X_HeroBlow:    jsr HeroBlow
+X_HeroBlow:    lda #100
+ sta skMult
+ jsr HeroBlow
+ rtl
+X_SkillStart:  jsr SkillStart
+ rtl
+X_SkillFire:   jsr SkillFire
+ rtl
+X_SkillTick:   jsr SkillTick
+ rtl
+X_SparkUpdate: jsr SparkUpdate
+ rtl
+X_NextSkill:   jsr NextSkill
+ rtl
+X_HeroArrow:   jsr HeroArrow
+ rtl
+X_ArrowShot:   jsr ArrowShot
+ rtl
+X_SkillsCalm:  jsr SkillsCalm
+ rtl
+X_SkillHud:    jsr SkillHud
+ rtl
+X_SkillOpen:   jsr SkillOpen
  rtl
 X_MonsterHit:  jsr MonsterHit
  rtl

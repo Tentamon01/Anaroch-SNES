@@ -144,6 +144,20 @@ InitVideo:
  lda #2048
  sta n3
  jsr DmaV
+ lda #fx_tiles              ; the skills' sparks: sprite tiles $AA-$AF and $BA-$BF
+ sta n0
+ lda #^fx_tiles
+ sta n1
+ lda #$6AA0
+ sta n2
+ lda #192
+ sta n3
+ jsr DmaV
+ lda #fx_tiles + 192
+ sta n0
+ lda #$6BA0
+ sta n2
+ jsr DmaV
  jsr InitColors
  lda #wglow_tiles
  sta n0

@@ -35,10 +35,17 @@ GameStats:
  jmp StatsClose
 @tabs:
  lda padnew
- and #PAD_L|PAD_R
- beq @in
+ and #PAD_L
+ beq @right
  jsr StatsClose
  jsl $800000+X_BagOpen
+ rts
+@right:
+ lda padnew
+ and #PAD_R
+ beq @in
+ jsr StatsClose
+ jsl $800000+X_SkillOpen
  rts
 @in:
  lda padnew

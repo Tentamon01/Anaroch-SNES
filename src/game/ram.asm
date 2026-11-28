@@ -145,19 +145,13 @@ ecur:     .res NACT*2
 estk:     .res NACT*2
 ealt:     .res NACT*2
 eanimt:   .res NACT*2
+estun:    .res NACT*2        ; frames stunned, chilled
+echill:   .res NACT*2
 dtyp:     .res 16
 dpx:      .res 16
 dpy:      .res 16
 damt:     .res 16
 dage:     .res 16
-ax:       .res 12
-ay:       .res 12
-avx:      .res 12
-avy:      .res 12
-alife:    .res 12
-astr:     .res 12
-adir:     .res 12
-aown:     .res 12
 belt:     .res 8
 qbuf:     .res 48
 numbuf:   .res 12
@@ -186,15 +180,37 @@ prow:     .res 2
 prow0:    .res 2
 pcol0:    .res 2
 pcol1:    .res 2
+.ram $1380                   ; arrows and bolts, and the sparks of the skills
+ax:       .res NARROW*2
+ay:       .res NARROW*2
+avx:      .res NARROW*2
+avy:      .res NARROW*2
+alife:    .res NARROW*2
+astr:     .res NARROW*2
+adir:     .res NARROW*2
+aown:     .res NARROW*2
+akind:    .res NARROW*2      ; 0 arrow, 1 fire arrow, 2 fire bolt, 3 fireball, 4 explosive arrow, 5 ice arrow
+amult:    .res NARROW*2      ; percent of a blow, or a spell's damage
+aburst:   .res NARROW*2
+apierce:  .res NARROW*2
+ahit:     .res NARROW*2      ; the monsters it has been through
+fxl:      .res FX_N*2        ; sparks: frames left, picture, place and movement (sixteenths), height
+fxt:      .res FX_N*2
+fxx:      .res FX_N*2
+fxy:      .res FX_N*2
+fxvx:     .res FX_N*2
+fxvy:     .res FX_N*2
+fxz:      .res FX_N*2
+fxvz:     .res FX_N*2
 .ram $1600
 ocid:     .res 128
 ocst:     .res 128
 ol_y:     .res 32
 ol_t:     .res 32
 oq:       .res 24
-dyn_key:  .res 96
-dyn_rx:   .res 96
-dyn_ref:  .res 96
+dyn_key:  .res 128
+dyn_rx:   .res 128
+dyn_ref:  .res 128
 .ram $0540
 oam:      .res 544
 .ram $0800

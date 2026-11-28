@@ -103,6 +103,7 @@ UpdateWorld:
  cpx #NACT*2
  bne @m
  jsr UpdateArrows
+ jsl $800000+X_SparkUpdate
  jsr UpdateDrops
  lda sayt
  beq @r

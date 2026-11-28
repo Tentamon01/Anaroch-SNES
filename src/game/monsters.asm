@@ -86,6 +86,8 @@ MonsterSpawn:
  stz.w elost,x
  stz.w ecall,x
  stz.w estk,x
+ stz.w estun,x
+ stz.w echill,x
  lda #180
  jsr RandRange
  sta.w ewt,x
@@ -110,6 +112,26 @@ PickSpawn:
 UpdateMonster:
  .a16
  .i16
+ lda.w est,x
+ cmp #ST_DEAD
+ bcs @go
+ lda.w echill,x             ; chilled: it lives at half the pace
+ beq @warm
+ dec.w echill,x
+ lda frame
+ and #1
+ beq @warm
+ rts
+@warm:
+ lda.w estun,x              ; stunned: it stands where it is
+ beq @go
+ dec.w estun,x
+ lda.w eflash,x
+ beq @s
+ dec.w eflash,x
+@s:
+ rts
+@go:
  inc.w etm,x
  lda.w est,x
  cmp #ST_DEAD

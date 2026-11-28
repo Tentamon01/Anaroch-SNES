@@ -33,6 +33,7 @@ NewGame:
 RiseAgain:
  .a16
  .i16
+ jsl $800000+X_SkillsCalm
  lda.w emaxhp
  sta.w ehp
  lda #START_X*16

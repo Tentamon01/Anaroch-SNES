@@ -236,8 +236,27 @@ def stamina_img():
     return Image.merge('RGBA', (g, r, b, al))
 
 smalls = [potion_img(), gold_img(), tome_img()] + [arrow_img(d) for d in range(8)]
-if PLACED: smalls += [gear_img(), scroll_img(), key_img(), stamina_img()]
-small_cols, small_near = quantize(smalls, 15)
+def glow_img(core, edge, arms):
+    im = Image.new('RGBA', (16, 16), (0, 0, 0, 0)); d = ImageDraw.Draw(im)
+    if arms:
+        for x0, y0, x1, y1 in ((8, 2, 8, 13), (2, 8, 13, 8), (4, 4, 11, 11), (11, 4, 4, 11)): d.line((x0, y0, x1, y1), fill=edge, width=1)
+        d.ellipse((6, 6, 10, 10), fill=core)
+    else:
+        d.ellipse((4, 4, 11, 11), fill=edge); d.ellipse((6, 5, 9, 9), fill=core); d.point((11, 12), fill=edge); d.point((4, 3), fill=edge)
+    return im
+def heal_img():
+    im = Image.new('RGBA', (16, 16), (0, 0, 0, 0)); d = ImageDraw.Draw(im)
+    d.rectangle((6, 3, 9, 12), fill=(40, 150, 60, 255)); d.rectangle((3, 6, 12, 9), fill=(40, 150, 60, 255)); d.rectangle((7, 4, 8, 11), fill=(170, 255, 180, 255)); d.rectangle((4, 7, 11, 8), fill=(170, 255, 180, 255))
+    return im
+effects = [glow_img((255, 240, 170, 255), (240, 110, 30, 255), False), glow_img((255, 255, 255, 255), (120, 180, 255, 255), True), glow_img((255, 240, 180, 255), (200, 160, 70, 255), True)]
+if PLACED: smalls += [gear_img(), scroll_img(), key_img(), stamina_img(), heal_img()]
+small_cols, small_near = quantize(smalls + (effects if PLACED else []), 15)
+fx_tiles = bytearray(2 * 6 * 32)             # fire, frost, sparks: two tile rows of six (sprite tiles $AA and $BA on)
+for k, im in enumerate(effects):
+    t = tiles_of(index_img(im, small_near))
+    for ty in range(2):
+        for tx in range(2):
+            o = (ty * 6 + k * 2 + tx) * 32; fx_tiles[o:o + 32] = enc_tile(t[ty][tx])
 # tiles $80..$BF (4 rows of 16): the 16x16 pictures go at $80,$82,..,$8E then $A0,$A2,...
 obj_static = bytearray(4 * 16 * 32)
 for k, im in enumerate(smalls):
@@ -289,7 +308,7 @@ FONT = {
 }
 CHARS = ' 0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ/:+-.()>\'!'
 if PLACED:
-    CHARS += '%'; FONT['%'] = '11001 11010 00010 00100 01000 01011 10011'
+    CHARS += '%,'; FONT['%'] = '11001 11010 00010 00100 01000 01011 10011'; FONT[','] = '00000 00000 00000 00000 01100 00100 01000'
 FONT_BASE = len(hud_tiles)
 for ch in CHARS:
     rows = FONT[ch].split() if FONT[ch] else []
@@ -747,7 +766,7 @@ def blob(name, data):
     open(os.path.join(OUT, name + '.bin'), 'wb').write(data)
     lines.append(f'{name}: .incbin "../out/{name}.bin"'); cur['pc'] += len(data)
 cur['bank'] += 1; cur['pc'] = 0x8000; lines.append(f'.bank {cur["bank"]}')
-for name, data in (('bg_tiles', bg_tiles), ('obj_static', bytes(obj_static)), ('obj_props', bytes(obj_props)), ('hud_tiles', hud_bin), ('world', bytes(world)), ('coll', coll)):
+for name, data in (('bg_tiles', bg_tiles), ('obj_static', bytes(obj_static)), ('fx_tiles', bytes(fx_tiles)), ('obj_props', bytes(obj_props)), ('hud_tiles', hud_bin), ('world', bytes(world)), ('coll', coll)):
     blob(name, data)
 cur['bank'] += 1; cur['pc'] = 0x8000; lines.append(f'.bank {cur["bank"]}')
 blob('m7_chars', bytes(m7_chars))

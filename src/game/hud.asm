@@ -212,6 +212,7 @@ BELT_ROW = 23
 HudRefresh:
  .a16
  .i16
+ jsl $800000+X_SkillHud
  lda.w emaxhp               ; the vial: liquid from cut = top + (1 - life / max) * (bot - top) down
  sec
  sbc.w ehp

@@ -108,8 +108,8 @@ Rules and numbers are generated from the N64 version's source files by build scr
 - World: seven acts, 128 areas, towns and houses, people, 16 quests with their choices, waypoints, town portals.
 - Mercenaries, saves in several slots, New Game+.
 
-Controls: B attack, Y skill, A talk and pick up, X drink, L and R change belt slot and skill (hold R for skills),
-Select character and bag, Start pause. Bag and windows are cursor menus made for a pad.
+Controls: B attack, Y skill, A talk and pick up, X drink, L the next belt place, R the next skill, Select the bag,
+skill trees and character window, Start pause. Bag and windows are cursor menus made for a pad.
 
 Saving needs battery memory: it is added to the board.
 
@@ -126,8 +126,9 @@ Each step ends in a ROM you can run, and the next starts after you have seen it.
 - *Done when:* you approve how it looks, sounds and plays. This sets the standard for everything after.
 
 **2. The core of the RPG**, in four parts
-- *2a (built 2026-11-27):* stats, items, bag and equipment, belt, drops. Also the studio's splash, as the N64's.
-- *2b:* skills and their trees, stamina, the skill button.
+- *2a (done, approved 2026-11-27):* stats, items, bag and equipment, belt, drops. Also the studio's splash, as the
+  N64's.
+- *2b (built 2026-11-27):* skills and their trees, stamina, the skill button.
 - *2c:* Stormreach Keep with its people and shop, gates between areas.
 - *2d:* saving.
 

@@ -88,11 +88,14 @@ view with eight monsters.
 - **Step 1 (approved 2026-11-27):** the streamed world, movement, walking behind walls, trees and graves, the braziers'
   glow, the music and sound effects, whole figures in every pose.
 - **Step 2, part 1:** the N64 version's items: five qualities, affixes and uniques, drops, a bag with pictures, seven
-  worn slots, the belt, five stats, its damage formula and experience curve. Parts to come: skills, Stormreach Keep
-  with its people and shop, saving.
+  worn slots, the belt, five stats, its damage formula and experience curve.
+- **Step 2, part 2:** the N64 version's 36 skills in their three trees (melee, ranged, spells): skill points, stamina,
+  15 passives and 21 skills that are cast. Parts to come: Stormreach Keep with its people and shop, saving.
 
-Pad: B attack, A pick up, X drink or read from the belt, L / R choose a belt place, Select the bag (there: A wear or
-take off, X use, Y drop, L or R the character window), Start pause.
+Pad: B attack, Y use the skill on the button, R the next learned skill onto it, A pick up, X drink or read from the
+belt, L the next belt place, Select the bag, Start pause.
+In the bag: A wear or take off, X use, Y drop, L the skill trees, R the character window.
+In the skill trees: A learn, Y put on the button, L the character window, R the bag, B close.
 
     python tools/build_assets.py --placed        # characters (a square per pose), HUD
     node tools/make_area_unlit.mjs && node tools/render_area.mjs gymoon t1 --from=out/step0/graveyard_unlit.glb --flat --moon --exposure=1.9
@@ -103,13 +106,16 @@ take off, X use, Y drop, L or R the character window), Start pause.
     node tools/build_audio.mjs                   # music, effects and the sound driver
     node tools/build_game.mjs                    # out/anaroch_game.sfc + .bml for ares_dual
     node tools/test_rules.mjs                    # the item, stat, damage and experience rules, called in the ROM
+    node tools/test_skills.mjs                   # every skill cast in the ROM, every passive measured
     node tools/test_game.mjs 3000                # random play; every shown tile and the text layer checked
     ares_dual/ares.exe --system "Super Famicom" --no-file-prompt out/anaroch_game.sfc
 
-- **Source:** `src/game.asm` and `src/game/*.asm`; the rules and the bag screen in `src/rules/` (ROM bank 42); the
+- **Source:** `src/game.asm` and `src/game/*.asm`; the rules, the skills and their screens in `src/rules/` (ROM bank 42); the
   splash player in `src/splash.asm`. (The first version's `src/main.asm` is kept for its own build.)
 - **Not yet like the N64:** the hero always looks like a swordsman, whatever is worn; a bow shoots but is not drawn;
   weapons have no special tricks yet; the warning screen and the title screen are not made.
+- **Skills, next to the N64:** a spell is cast with the sword swing's pictures; effects are small sprites (no clouds
+  of particles, screen shake or damage numbers); the angles of fans and aimed shots are rounded.
 - **Characters:** a 32x32 square couldn't hold every pose from one fixed spot (feet were cut off in most of them),
   so each pose has its own place for the square, and the widest or tallest ones get one 16x16 piece more.
 - **Walking behind things** (`src/occlude.asm`): everything that stands up is cut into 16x16 blocks with a depth and,

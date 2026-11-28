@@ -20,7 +20,7 @@ const cell = (c, r) => {
 };
 let seed = 5; const rnd = (n) => (seed = (seed * 16807) % 2147483647) % n;
 const PADS = [0x0800, 0x0400, 0x0200, 0x0100, 0x0A00, 0x0900, 0x0600, 0x0500];
-let textBad = 0, opened = 0, bagFrames = 0, winFrames = 0, most = 0, checked = 0, bad = 0, firstBad = null, deaths = 0, pad = 0, worstQ = 0;
+let casts = 0, sparksMost = 0, textBad = 0, opened = 0, bagFrames = 0, winFrames = 0, most = 0, checked = 0, bad = 0, firstBad = null, deaths = 0, pad = 0, worstQ = 0;
 s.breaks.set(sy.FlushQueue, () => { worstQ = Math.max(worstQ, w(sy.sq) / sy.QREC); });
 const N = +(process.argv[2] || 3000);
 boot(s, sy);
@@ -36,10 +36,17 @@ for (let f = 0; f < N; f++) {
   if (f % 7 === 0 && w(sy.mode) === 0) s.pad |= 0x0080;                  // A: pick up
   if (f % 601 === 300 && w(sy.mode) === 0) s.pad = 0x2000;               // Select: the bag
   if (w(sy.mode) === 4) {                                                // in the bag: buttons at random, then close
-    const keys = [0x0800, 0x0400, 0x0200, 0x0100, 0x0200, 0x0080, 0x0040, 0x4000, 0x0020, 0];
-    s.pad = f % 4 === 0 ? keys[rnd(10)] : 0; if (f % 601 > 450 && f % 8 < 2) s.pad = 0x8000; bagFrames++;
+    const keys = [0x0800, 0x0400, 0x0200, 0x0100, 0x0200, 0x0080, 0x0040, 0x4000, 0x0020, 0x0010, 0];
+    s.pad = f % 4 === 0 ? keys[rnd(11)] : 0; if (f % 601 > 450 && f % 8 < 2) s.pad = 0x8000; bagFrames++;
   }
   if (w(sy.mode) === 3) { const keys = [0x0800, 0x0400, 0x0080, 0x0020, 0x8000, 0]; s.pad = f % 6 === 0 ? keys[rnd(6)] : 0; winFrames++; }
+  // skills: every one known, stamina kept up, a random one on the button now and then and cast
+  if (w(sy.mode) === 0) {
+    if (f % 240 === 0) { for (let k = 0; k < 36; k++) pw(sy.skRank + k * 2, 1 + rnd(5)); const act = [0, 1, 2, 3, 4, 5, 12, 13, 14, 15, 16, 17, 23, 35]; pw(sy.skActive, act[rnd(act.length)]); pw(sy.stam, w(sy.maxStam)); }
+    if (f % 37 === 5) { s.pad = pad | 0x4000; casts++; }
+    if (f % 311 === 100) s.pad = 0x0010;
+  }
+  let sparkN = 0; for (let k = 0; k < 16; k++) if (w(sy.fxl + k * 2)) sparkN++; sparksMost = Math.max(sparksMost, sparkN);
   const m0 = w(sy.mode);
   s.runFrame(60000);
   if (m0 !== 1 && w(sy.mode) === 1) deaths++;
@@ -67,6 +74,7 @@ for (let f = 0; f < N; f++) {
 }
 console.log(`text layer checked: ${textBad} times unlike the game's copy`);
 if (textBad) process.exitCode = 1;
+console.log(`skill button pressed ${casts} times; most sparks at once ${sparksMost}`);
 console.log(`bag opened ${opened} times (${bagFrames} frames, character window ${winFrames}); most pieces carried ${most}; level ${w(sy.level)}; gold ${w(sy.gold)}`);
 console.log(`checked ${checked} shown tiles over ${N} frames: ${bad} wrong; deaths ${deaths}; most stream records in a frame ${worstQ}; slowdowns ${w(sy.lagc)}; kills ${w(sy.kills)}`);
 if (firstBad) console.log('first wrong', firstBad);

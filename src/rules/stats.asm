@@ -20,6 +20,7 @@ NewKit:                      ; a new hero: stats at 10, a wooden sword and armou
  sta sDex
  sta sEne
  stz skillPts
+ jsr SkillsNew
  stz xph
  stz heroFlags
  lda #1                     ; Wooden Sword
@@ -140,6 +141,7 @@ StatsRecalc:
 @_far0:
  pla
  sta it
+ jsr Passives
 
  ldx #0                     ; resistances: the pieces', all of them, the Four Winds; at most 75
 @res:
@@ -190,6 +192,17 @@ StatsRecalc:
  bpl @en
  lda #0
 @en:
+ sta r7
+ asl                        ; spells: + 2 % a point of energy (of a thousand, 20 each)
+ asl
+ clc
+ adc r7
+ asl
+ asl
+ clc
+ adc spellPm
+ sta spellPm
+ lda r7
  asl
  sta r1                     ; stamina: 100 + 2 a level + 2 a point of energy
  lda level
@@ -204,6 +217,24 @@ StatsRecalc:
  bcs @st
  sta stam
 @st:
+ sta rm                     ; stamina's return: 1.5 % of it a second, more with the passive; 0.6 % in a fight
+ lda stamRegen
+ clc
+ adc #100
+ jsr Mul16
+ lda #16
+ jsr Div32
+ lda rl
+ sta stamRate
+ asl
+ sta rl
+ stz rh
+ lda #5
+ jsr Div32
+ lda rl
+ sta stamFight
+ lda #1
+ sta skDirty
  lda pmods+K_CRIT_CHANCE_PERCENT*2   ; critical: 5 % + the pieces' + 0.1 % a point of dexterity
  clc
  adc pmods+K_DEADLY_STRIKE_PERCENT*2
@@ -485,7 +516,16 @@ HeroBlow:
  sta tmpD
  lda.w edef,x
  sta tmpF
- lda pmods+K_ENHANCE_DAMAGE_PERCENT*2
+ lda skMult                 ; a skill's blow, a battle cry
+ ldy cryLeft
+ beq @nocry
+ ldy cryBonus
+ jsr Pct
+@nocry:
+ sec
+ sbc #100
+ clc
+ adc pmods+K_ENHANCE_DAMAGE_PERCENT*2
  sta cEnh
  lda critPm
  sta cCrit

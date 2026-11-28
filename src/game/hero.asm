@@ -25,25 +25,19 @@ UpdateHero:
  dec.w eflash
 @nf:
  lda padnew                 ; the belt: L / R choose a slot, X drinks from it
- and #PAD_L
+ and #PAD_L                 ; L: the next belt place
  beq @nl
- lda beltsel
- clc
- adc #3
- and #3
- sta beltsel
- lda #1
- sta hudflag
-@nl:
- lda padnew
- and #PAD_R
- beq @nr
  lda beltsel
  inc a
  and #3
  sta beltsel
  lda #1
  sta hudflag
+@nl:
+ lda padnew
+ and #PAD_R                 ; R: the next skill onto the button
+ beq @nr
+ jsl $800000+X_NextSkill
 @nr:
  lda padnew
  and #PAD_X
@@ -70,6 +64,31 @@ UpdateHero:
  lda #1
  sta hudflag
 @nreg:
+ jsl $800000+X_SkillTick
+ cmp #0
+ beq @own
+ cmp #1
+ bne @held
+ jsr PadDir                 ; spinning: he may walk
+ cmp #$FFFF
+ beq @held
+ asl
+ tax
+ lda.w hspd,x
+ sta tmpC
+ lda.w hspd+16,x
+ sta tmpD
+ ldx #0
+ jsr MoveEnt
+@held:
+ lda #ST_ATTACK
+ sta.w est
+ lda #HERO_HIT_AT
+ sta.w etm
+ lda #1
+ sta.w edealt
+ rts
+@own:
  jsr PadDir
  sta tmpB                   ; the d-pad's direction or $FFFF
  lda.w est
@@ -88,7 +107,21 @@ UpdateHero:
  rts
 @nh:
  lda padnew
- and #PAD_B|PAD_Y
+ and #PAD_Y
+ beq @nosk
+ lda tmpB
+ cmp #$FFFF
+ beq @sk
+ sta.w edir
+@sk:
+ jsl $800000+X_SkillStart
+ lda.w est
+ cmp #ST_ATTACK
+ bne @nosk
+ rts
+@nosk:
+ lda padnew
+ and #PAD_B
  beq @move
  lda tmpB
  cmp #$FFFF
@@ -141,13 +174,18 @@ UpdateHero:
  lda.w edealt
  bne @nd
  inc.w edealt
+ lda casting
+ bmi @plain
+ jsl $800000+X_SkillFire
+ bra @nd
+@plain:
  jsr HeroStrike
 @nd:
  lda.w etm
  cmp #HERO_CHAIN
  bcc @nochain
  lda padnew
- and #PAD_B|PAD_Y
+ and #PAD_B
  beq @nochain
  lda tmpB
  cmp #$FFFF
@@ -196,7 +234,8 @@ HeroStrike:
  .i16
  lda ranged
  beq @melee
- jmp ShootHero
+ jsl $800000+X_ArrowShot
+ rts
 @melee:
  stz landed
  ldx #2

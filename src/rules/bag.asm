@@ -37,6 +37,7 @@ BagOpen:
  .i16
  lda #M_BAG
  sta mode
+ stz bagPage
  lda #Z_GRID
  sta bagZone
  stz bagCx
@@ -50,6 +51,13 @@ BagOpen:
 
 ; the whole screen, with the screen blank: tiles, colours, pictures, maps
 BagSetup:
+ .a16
+ .i16
+ jsr MenuBegin
+ jmp BagLoad
+
+; the screen blanked and set up for a page of the bag screen, its tiles copied
+MenuBegin:
  .a16
  .i16
  sep #$20
@@ -84,6 +92,24 @@ BagSetup:
  lda #MENU_TILES_BYTES
  sta n3
  jsl FarDmaV
+ rts
+
+; both maps sent, the picture lit again
+MenuShow:
+ .a16
+ .i16
+ jsl FarMenuSend            ; both maps now (the screen is blank)
+ sep #$20
+ .a8
+ lda #$80
+ sta $420C                  ; the bars again: the picture from the next frame
+ rep #$20
+ .a16
+ rts
+
+BagLoad:
+ .a16
+ .i16
  ldx #0                     ; the colours
  sep #$20
  .a8
@@ -103,7 +129,7 @@ BagSetup:
  dex
  dex
  bpl @cl
- lda #14                    ; the first free tile (after the cells and the box frame)
+ lda #16                    ; the first free tile (after the cells and the box frame)
  sta bagTile
  ldx #BAG0                  ; every piece's picture: the bag, worn, the belt
 @p:
@@ -122,14 +148,7 @@ BagSetup:
  cpx #DROP0
  bcc @p
  jsr BagDraw
- jsl FarMenuSend            ; both maps now (the screen is blank)
- sep #$20
- .a8
- lda #$80
- sta $420C                  ; the bars again: the picture from the next frame
- rep #$20
- .a16
- rts
+ jmp MenuShow
 
 ; -> A = the picture of piece `it` (icons.c icon_id)
 IconId:
@@ -1041,6 +1060,7 @@ BagCursor:
  and #$00FF
  sta dh
 @draw:
+CursorBox:
  stz r3
 @y:
  stz r2
@@ -1111,6 +1131,10 @@ cur_of: .byte $FF, 6, 7, $FF, 4, 0, 1, $FF, 5, 2, 3, $FF, $FF, $FF, $FF, $FF
 BagInput:
  .a16
  .i16
+ lda bagPage
+ beq @bag
+ jmp SkillInput
+@bag:
  lda padnew
  and #PAD_B | PAD_SELECT | PAD_START
  beq @nc
@@ -1125,11 +1149,19 @@ BagInput:
  jmp BagClose
 @nc:
  lda padnew
- and #PAD_L | PAD_R
- beq @nt
- jsr BagClose
+ and #PAD_R
+ beq @nl_
+ jsr BagClose               ; R: the character window, L: the skills
  jsl FarStatsOpen
  rts
+@nl_:
+ lda padnew
+ and #PAD_L
+ beq @nt
+ lda #1
+ sta bagPage
+ stz msgp
+ jmp SkillSetup
 @nt:
  lda padnew
  and #PAD_UP

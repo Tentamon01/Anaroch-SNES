@@ -141,53 +141,71 @@ DirFrom:
  lda #3
  rts
 
-; DotDir: Y = direction * 2, tmp0 = dx, tmp2 = dy -> A = 10 * (the direction's unit vector . (dx, dy)), signed
+; DotDir: Y = direction * 2, tmp0 = dx, tmp2 = dy -> A = 10 * (the direction's unit vector . (dx, dy)), signed.
+; The directions are the screen's eight, as they lie in the world (the way each one walks); 8 more entries are their
+; right angles, for how far something stands to the side. X, Y kept
 DotDir:
  .a16
+ .i16
+ phy
  stz tmp3
- lda.w dirx,y
- beq @fy
- bmi @xm
  lda tmp0
- sta tmp3
- bra @fy
-@xm:
- lda #0
- sec
- sbc tmp0
- sta tmp3
-@fy:
- lda.w diry,y
- beq @one
- bmi @ym
- lda tmp3
+ sta dotv
+ jsr DotPart
+ tya
  clc
- adc tmp2
- sta tmp3
- bra @two
-@ym:
+ adc #32
+ tay
+ lda tmp2
+ sta dotv
+ jsr DotPart
+ ply
  lda tmp3
- sec
- sbc tmp2
- sta tmp3
-@two:
- lda.w dirx,y
- beq @one
- lda tmp3                   ; diagonal: * 7 (10 / sqrt 2)
- asl
- asl
- asl
- sec
- sbc tmp3
  rts
-@one:
- lda tmp3                   ; * 10
- asl
- asl
+DotPart:                    ; tmp3 += dotv * dot_x[Y] (the lengths within 255 pixels)
+ .a16
+ .i16
+ eor.w dot_x,y
+ sta dots
+ lda dotv
+ bpl @a
+ eor #$FFFF
+ inc a
+@a:
+ cmp #256
+ bcc @b
+ lda #255
+@b:
+ sep #$20
+ .a8
+ sta $4202
+ rep #$20
+ .a16
+ lda.w dot_x,y
+ bpl @c
+ eor #$FFFF
+ inc a
+@c:
+ sep #$20
+ .a8
+ sta $4203
+ rep #$20
+ .a16
+ nop
+ nop
+ nop
+ lda $4216
+ bit dots
+ bpl @add
+ eor #$FFFF
+ inc a
+@add:
  clc
  adc tmp3
- asl
+ sta tmp3
  rts
+dot_x: .word 5, 0, $FFF9, $FFF7, $FFFB, 0, 7, 9, $FFF7, $FFF6, $FFF9, 5, 9, 10, 7, $FFFB
+dot_y: .word 9, 10, 7, $FFFB, $FFF7, $FFF6, $FFF9, 5, 5, 0, $FFF9, $FFF7, $FFFB, 0, 7, 9
 
 ; RelHero: X = actor -> tmp0 = hero.x - x, tmp2 = hero.y - y (px), A = tmp4 = distance
 RelHero:

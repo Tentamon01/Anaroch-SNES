@@ -14,12 +14,14 @@ os.makedirs(OUT, exist_ok=True)
 data_h = open(os.path.join(N64, 'src', 'items_data.h')).read()
 items_h = open(os.path.join(N64, 'src', 'items.h')).read()
 items_c = open(os.path.join(N64, 'src', 'items.c')).read()
+skills_h = open(os.path.join(N64, 'src', 'skills.h')).read()
+skills_c = open(os.path.join(N64, 'src', 'skills.c')).read()
 
 # ------------------------------------------------------------------ reading C initialisers
 enums = {}
-for body in re.findall(r'enum\s*\{(.*?)\}', data_h + items_h, re.S):
+for body in re.findall(r'enum\s*\{(.*?)\}', data_h + items_h + skills_h, re.S):
     n = 0
-    for part in re.sub(r'//[^\n]*', '', body).split(','):
+    for part in re.sub(r'//[^\n]*|/\*.*?\*/', '', body).split(','):
         part = part.strip()
         if not part: continue
         if '=' in part:
@@ -75,14 +77,14 @@ strings = {}
 def s_(text):
     """a string's label (upper case; the font has no lower case)"""
     t = text.upper()
-    assert re.fullmatch(r"[ 0-9A-Z/:+\-.()>'!%#]*", t), t
+    assert re.fullmatch(r"[ 0-9A-Z/:+\-.()>'!%#,]*", t), t
     if t not in strings: strings[t] = f'rs{len(strings)}'
     return strings[t]
 def names(label, texts):
     lines.append(f'{label}:')
     for k in range(0, len(texts), 8): lines.append(' .word ' + ', '.join(s_(t) for t in texts[k:k + 8]))
 
-lines += ['.bank 42', '.org $E000']
+lines += ['.bank 42', '.org $D400']
 lines += [f'K_COUNT = {K}', f'UNIQUE_COUNT = {len(uniques)}', f'AFFIX_COUNT = {len(affixes)}', f'TIER_COUNT = {len(tiers)}']
 for n in ('K_ENHANCE_DAMAGE_PERCENT', 'K_FIRE_DAMAGE', 'K_COLD_DAMAGE', 'K_LIGHTNING_DAMAGE', 'K_POISON_DAMAGE', 'K_DEADLY_STRIKE_PERCENT',
           'K_ATTACK_SPEED_PERCENT', 'K_CRIT_CHANCE_PERCENT', 'K_LIFESTEAL_PERCENT', 'K_KNOCKBACK_PERCENT', 'K_DAMAGE_VS_UNDEAD_PERCENT',
@@ -158,6 +160,45 @@ names('potion_name', potions); names('scroll_name', scrolls); names('key_name', 
 names('potion_text', ['Heals 45% of life', 'Restores stamina', '+3 stat points'])
 names('scroll_text', ['Opens a way to town', 'Identifies a piece', '+1 skill point', '+10% all resists'])
 names('key_text', ['Opens one chest'])
+
+# ------------------------------------------------------------------ the skills (skills.c)
+skills = table('skills', skills_c)
+assert len(skills) == 36
+SK = enums
+scale = float(re.search(r'#define STAMINA_SCALE ([\d.]+)', skills_c).group(1))
+def wrap(text, n=30):
+    out = ['']
+    for word in text.split():
+        if out[-1] and len(out[-1]) + 1 + len(word) > n: out.append(word)
+        else: out[-1] = (out[-1] + ' ' + word).strip()
+    assert len(out) <= 2, text
+    return out + [''] * (2 - len(out))
+lines.append('skill_tab:                   ; 32 bytes: tree, tier, column, needs, level, weapon, kind, stamina, power %, a, b, wait, name, two lines')
+for i, k in enumerate(skills):
+    name, tree, tier, col, need, level, weapon, kind, cost, mult, a_, b_, cd, text = k
+    a = b = 0; power = half_up(mult * 100)
+    metres = lambda v: half_up(v * 16); secs = lambda v: half_up(v * 60)
+    if kind == SK['SK_SLAM']: b = secs(b_)
+    elif kind == SK['SK_CRY']: a = secs(a_)
+    elif kind == SK['SK_SPIN']: a = metres(a_); b = int(b_)
+    elif kind == SK['SK_LINE']: a = metres(a_); b = metres(b_ / 2)
+    elif kind in (SK['SK_LEAP'],): a = metres(a_); b = metres(b_)
+    elif kind in (SK['SK_FAN'], SK['SK_STRAFE'], SK['SK_CHAIN']): a = int(a_); b = metres(b_) if kind == SK['SK_CHAIN'] else 0
+    elif kind in (SK['SK_FIREARROW'], SK['SK_EXPLODE'], SK['SK_FIREBALL']): a = metres(a_)
+    elif kind in (SK['SK_NOVA'], SK['SK_STOMP']): a = metres(a_); b = secs(b_)
+    elif kind == SK['SK_HEAL']: a = secs(a_)
+    elif kind == SK['SK_TELEPORT']: a = metres(a_)
+    elif kind == SK['SK_METEOR']: a = metres(a_); b = secs(b_)
+    elif kind == SK['SK_PASSIVE']: a = int(a_); power = int(mult)
+    one, two = wrap(text.replace(';', ','))
+    lines.append(' .word ' + ', '.join(str(v & 0xFFFF) for v in (tree, tier, col, need, level, weapon, kind, half_up(cost * scale), power, a, b, secs(cd))))
+    lines.append(f' .word {s_(name)}, {s_(one)}, {s_(two)}, 0')
+passive_words = ['+#% MELEE DAMAGE', '+#% DEFENSE', '+#% LIFE STOLEN', '+#% MELEE SPEED', '+#% LIFE', '+#% BOW DAMAGE', '+#% CRIT CHANCE', '+#% EVADE',
+                 '+#% BOW SPEED', '+#% SPEED ON FOOT', '+#% SPELL DAMAGE', '+#% STAMINA RETURN', '+#% BLOCK', '+# FIRE DAMAGE', '+#% LIFE A SECOND']
+names('passive_name', passive_words)
+words('fan5', [v & 0xFFFF for v in (-65, -32, 0, 32, 65)])
+words('fan9', [v & 0xFFFF for v in (-175, -123, -79, -39, 0, 39, 79, 123, 175)])
+names('tree_name', ['Melee', 'Ranged', 'Spells'])
 
 for t, label in strings.items():
     lines.append(f'{label}: .byte "{t}", 0')
@@ -252,6 +293,29 @@ def frame_tile(fx, fy):          # a worn box's frame, nine pieces: left / middl
             px.append(1 if e == 0 else 14 if e == 1 else 2)
     return enc4(px)
 menu = enc4([1] * 64) + tiles(cell, 16, 16) + b''.join(frame_tile(fx, fy) for fy in range(3) for fx in range(3))
+menu += enc4([14 if x in (3, 4) else 1 for y in range(8) for x in range(8)])     # 14: a line running down
+menu += enc4([14 if y in (3, 4) else 1 for y in range(8) for x in range(8)])     # 15: a line running across
+# the skills' pictures: a palette a tree (colours 3..13), and the same darkened for the ones not learned
+sicons = [Image.open(os.path.join(N64, 'assets', 'skills', f's{i:02d}.png')).convert('RGBA').resize((16, 16), Image.LANCZOS) for i in range(36)]
+tree_cols = []
+for t_ in range(3):
+    px = [p[:3] for i, im in enumerate(sicons) if skills[i][1] == t_ for p in im.getdata() if p[3] >= 110]
+    q = Image.new('RGB', (len(px), 1)); q.putdata(px)
+    c_ = q.quantize(colors=11, method=Image.Quantize.MEDIANCUT, dither=Image.Dither.NONE).getpalette()[:33]
+    c_ = c_ + [0] * (33 - len(c_))
+    tree_cols.append([tuple(c_[k * 3:k * 3 + 3]) for k in range(11)])
+dim = lambda c: tuple(int((sum(c) / 3 * 0.7 + v * 0.3) * 0.45) + 6 for v in c)
+skill_pals = []
+for p in range(8):
+    cols = tree_cols[p % 3 if p < 6 else 0]
+    if 3 <= p < 6: cols = [dim(c) for c in cols]
+    skill_pals.append([(0, 0, 0), PANEL, CELL] + cols + [EDGE, INKS[p]])
+stiles = b''
+for i, im in enumerate(sicons):
+    pal = skill_pals[skills[i][1]]
+    idx = [2 if p[3] < 110 else min(range(2, 14), key=lambda j: (p[0] - pal[j][0]) ** 2 * 2 + (p[1] - pal[j][1]) ** 2 * 4 + (p[2] - pal[j][2]) ** 2) for p in im.getdata()]
+    stiles += tiles(idx, 16, 16)
+open(os.path.join(OUT, 'skill_tiles.bin'), 'wb').write(stiles)
 for k, b in enumerate(blobs): open(os.path.join(OUT, f'icons{k}.bin'), 'wb').write(b)
 open(os.path.join(OUT, 'menu_tiles.bin'), 'wb').write(menu)
 lines += ['.bank 44', '.org $C800', 'icon_info:                   ; per picture: address, tiles wide, high, palette, bank']
@@ -260,9 +324,12 @@ for addr, w, h, g, bk in info:
 lines.append('menu_pal:')
 for p in palettes:
     lines.append(' .word ' + ', '.join('$%04X' % bgr(c) for c in p))
-lines += [f'MENU_TILES_BYTES = {len(menu)}']
+lines.append('skill_pal:')
+for p in skill_pals:
+    lines.append(' .word ' + ', '.join('$%04X' % bgr(c) for c in p))
+lines += [f'MENU_TILES_BYTES = {len(menu)}', f'SKILL_TILES_BYTES = {len(stiles)}']
 for k in range(len(blobs)): lines += [f'.bank {45 + k}', '.org $8000', f' .incbin "../out/game/icons{k}.bin"']
-lines += ['.bank 56', '.org $8000', 'menu_tiles: .incbin "../out/game/menu_tiles.bin"']
+lines += ['.bank 56', '.org $8000', 'menu_tiles: .incbin "../out/game/menu_tiles.bin"', 'skill_tiles: .incbin "../out/game/skill_tiles.bin"']
 sheet = Image.new('RGB', (16 * 34, 9 * 50), PANEL)
 for i in range(134):
     sheet.paste(icons[i], ((i % 16) * 34, (i // 16) * 50), icons[i])
@@ -271,6 +338,6 @@ print(f'pictures {sum(map(len, blobs))} B in {len(blobs)} banks')
 
 open(os.path.join(ROOT, 'src', 'rules.inc'), 'w', newline='\n').write('\n'.join(lines) + '\n')
 json.dump({'families': families, 'bases': bases, 'affixes': affixes, 'uniques': uniques, 'quality': quality, 'uchance': uchance,
-           'tiers': tiers, 'tierLevels': tier_levels, 'slotGrid': slot_grid, 'values': vals, 'enums': enums},
+           'skills': skills, 'tiers': tiers, 'tierLevels': tier_levels, 'slotGrid': slot_grid, 'values': vals, 'enums': enums},
           open(os.path.join(ROOT, 'out', 'rules.json'), 'w'))
 print(f'{len(bases)} bases, {len(affixes)} affixes, {len(uniques)} uniques, {len(strings)} names; affix values {len(vals) * 2} B')

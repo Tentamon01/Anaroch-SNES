@@ -312,6 +312,24 @@ BuildOam:
  inx
  cpx #NDROP*2
  bne @dr
+ ldx #0
+@fx:
+ lda.w fxl,x
+ beq @fxn
+ lda.w fxx,x
+ lsr4
+ sta tmp0
+ lda.w fxy,x
+ lsr4
+ sta tmp2
+ txa
+ ora #$0400
+ jsr AddDyn
+@fxn:
+ inx
+ inx
+ cpx #FX_N*2
+ bne @fx
  stz dpos
  jsr EmitProps
  lda #0                     ; what is left of the moving things
@@ -399,11 +417,32 @@ FlushDyn:
  lda tmpB
  xba
  and #$00FF
- beq @actor
+ bne @_far0
+ jmp @actor
+@_far0:
  cmp #1
  beq @arrow
+ cmp #4
+ bne @block
+ lda tmpB                   ; a spark
+ and #$00FF
+ tax
+ lda.w fxt,x
+ sta tmp3
+ lda.w fxz,x
+ sta tmp5
+ lda pl
+ sec
+ sbc #9
+ sec
+ sbc tmp5
+ sta tmp1
+ jmp @small
+@block:
  cmp #3
- bne @loot
+ beq @isblock
+ jmp @loot
+@isblock:
  lda tmpB                   ; a walk-behind block
  and #$00FF
  tax
@@ -446,6 +485,21 @@ FlushDyn:
  tay
  lda.w arrow_tile,y
  sta tmp3
+ lda.w akind,x              ; bolts of fire, ice
+ beq @arrowpic
+ cmp #2
+ beq @fire
+ cmp #3
+ beq @fire
+ cmp #5
+ bne @arrowpic
+ lda #FX_FROST
+ sta tmp3
+ bra @arrowpic
+@fire:
+ lda #FX_FIRE
+ sta tmp3
+@arrowpic:
  lda pl
  sec
  sbc #23
@@ -515,6 +569,11 @@ EmitActor:
  lda tmp5
  xba
  jsr Signed
+ cpx #0
+ bne @ground
+ sec
+ sbc heroLift
+@ground:
  clc
  adc pl
  sec
@@ -532,8 +591,11 @@ EmitActor:
  beq @pal
  lda.w ekind,x
  inc a
+ ldy.w echill,x
+ bne @cold
  ldy.w echamp,x
  beq @pal
+@cold:
  inc a
  inc a
 @pal:
@@ -565,6 +627,11 @@ EmitActor:
  lda tmp6
  xba
  jsr Signed
+ cpx #0
+ bne @ground2
+ sec
+ sbc heroLift
+@ground2:
  clc
  adc pl
  sec
