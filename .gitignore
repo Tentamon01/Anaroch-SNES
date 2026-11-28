@@ -11,3 +11,5 @@ ares_dual/
 src/world.inc
 src/rules.inc
 src/splash.inc
+src/people.inc
+src/world_ram.inc

@@ -6,20 +6,20 @@ AddTile:
  stz swork
  stz sglow
  lda scol
- cmp #MAP_W
+ cmp mapW
  bcs @out
  lda srow
- cmp #MAP_H
+ cmp mapH
  bcs @out
  asl
  clc
  adc srow
  tax                        ; row * 3: its address
- lda.l rowptr,x
+ lda.l $7F0000+W_ROWPTR,x
  sta mptr
  sep #$20
  .a8
- lda.l rowptr+2,x
+ lda.l $7F0000+W_ROWPTR+2,x
  sta mptr+2
  rep #$20
  .a16
@@ -28,11 +28,11 @@ AddTile:
  tay
  lda [mptr],y
  sta swork
- lda.l glowptr,x
+ lda.l $7F0000+W_GLOWPTR,x
  sta gmp
  sep #$20
  .a8
- lda.l glowptr+2,x
+ lda.l $7F0000+W_GLOWPTR+2,x
  sta gmp+2
  rep #$20
  .a16
@@ -42,23 +42,23 @@ AddTile:
  sta sglow
 @out:
  ldx sq
- lda swork                  ; the tile's picture: 1024 to a bank
- and #$03FF
+ lda swork                  ; the tile's picture: 2048 to a bank of the data ROM
+ and #$07FF
  asl
  asl
  asl
  asl
  asl
- ora #$8000
  sta.w SQ,x
  lda swork
  and #$1FFF
  xba
  lsr
  lsr
- and #$0007
+ lsr
+ and #$0003
  clc
- adc #TILE_BANK
+ adc tileBank
  ora #$2000
  sta.w SQ+2,x
  lda slotc                  ; slot = column slot * 27 + row slot
@@ -343,13 +343,15 @@ UpdateCam:
  sec
  sbc tmp2
  clc
- adc #PIC_KX-128
+ adc picKX
+ sec
+ sbc #128
  bpl @a
  lda #0
 @a:
- cmp #PIC_W-256
+ cmp camMaxX
  bcc @b
- lda #PIC_W-256
+ lda camMaxX
 @b:
  sta camx
  lda tmp0
@@ -357,13 +359,15 @@ UpdateCam:
  adc tmp1
  lsr
  clc
- adc #PIC_KY-112
+ adc picKY
+ sec
+ sbc #112
  bpl @c
  lda #0
 @c:
- cmp #PIC_H-224
+ cmp camMaxY
  bcc @d
- lda #PIC_H-224
+ lda camMaxY
 @d:
  sta camy
  rts

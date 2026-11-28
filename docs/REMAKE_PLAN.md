@@ -128,8 +128,8 @@ Each step ends in a ROM you can run, and the next starts after you have seen it.
 **2. The core of the RPG**, in four parts
 - *2a (done, approved 2026-11-27):* stats, items, bag and equipment, belt, drops. Also the studio's splash, as the
   N64's.
-- *2b (built 2026-11-27):* skills and their trees, stamina, the skill button.
-- *2c:* Stormreach Keep with its people and shop, gates between areas.
+- *2b (done, approved 2026-11-27):* skills and their trees, stamina, the skill button.
+- *2c (built 2026-11-27):* Stormreach Keep with its houses, people and shop, gates between places, the town portal.
 - *2d:* saving.
 
 **3. Act I complete**

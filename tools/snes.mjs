@@ -81,6 +81,7 @@ export class Snes {
     if (a < 0x2000) { this.wram[a] = v; return; }
     this.reg[a] = v;
     switch (a) {
+      case 0x2180: { const w = ((this.reg[0x2181] | (this.reg[0x2182] << 8) | (this.reg[0x2183] << 16)) & 0x1FFFF); this.wram[w] = v; const n = (w + 1) & 0x1FFFF; this.reg[0x2181] = n & 255; this.reg[0x2182] = (n >> 8) & 255; this.reg[0x2183] = n >> 16; break; }   // the work memory port
       case 0x2102: this.oamaddr = (this.oamaddr & 0x200) | (v << 1); break;
       case 0x2103: this.oamaddr = (this.oamaddr & 0x1FE) | ((v & 1) << 9); break;
       case 0x2104: if (this.oamaddr < 544) this.oam[this.oamaddr] = v; this.oamaddr = (this.oamaddr + 1) % 544; break;

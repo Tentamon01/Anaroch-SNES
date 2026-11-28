@@ -4,13 +4,14 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { Snes } from './snes.mjs';
-import { boot } from './boot.mjs';
+import { boot, travel } from './boot.mjs';
 
 const root = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
 const s = new Snes(fs.readFileSync(path.join(root, 'out', 'anaroch_game.sfc')), { program: 0x200000 });
 const sy = JSON.parse(fs.readFileSync(path.join(root, 'out', 'anaroch_game.sym.json'), 'utf8'));
 const R = JSON.parse(fs.readFileSync(path.join(root, 'out', 'rules.json'), 'utf8'));
 boot(s, sy);
+travel(s, sy, 0);                    // (the graveyard: the town has no monsters)
 const w = (a) => s.wram[a] | (s.wram[a + 1] << 8);
 const pw = (a, v) => { s.wram[a] = v & 255; s.wram[a + 1] = (v >> 8) & 255; };
 const V = (n, i = 0) => w(sy[n] + i * 2);

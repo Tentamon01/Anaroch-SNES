@@ -9,7 +9,10 @@ FrameId:
  lda fid_jt,y
  sta jmpv
  jmp (jmpv)
-fid_jt: .word FidIdle, FidWalk, FidAtk, FidHit, FidDead, FidIdle
+fid_jt: .word FidIdle, FidWalk, FidAtk, FidHit, FidDead, FidIdle, FidNpc
+FidNpc:
+ lda.w ealert,x             ; walking, or standing
+ bne FidWalk
 FidIdle:
  lda.w etm,x
  lsr4
@@ -92,6 +95,16 @@ FidGo:
  asl4
  sec
  sbc tmp1
+ ldy.w ekind,x              ; the people have six pictures a direction
+ cpy #KIND_PEOPLE
+ bcc @fifteen
+ lda tmp1
+ asl
+ sta tmp1
+ asl
+ clc
+ adc tmp1
+@fifteen:
  clc
  adc tmp0
  rts
@@ -164,6 +177,27 @@ Enqueue:
  beq @g
  cmp #1
  beq @k
+ cmp #KIND_PEOPLE
+ bcc @h
+ sec                        ; a person's 48 pictures
+ sbc #KIND_PEOPLE
+ asl4
+ sta tmp3
+ asl
+ clc
+ adc tmp3
+ clc
+ adc tmp2
+ sta tmp3
+ asl
+ clc
+ adc tmp3
+ tay
+ lda.w npc_ptrs,y
+ sta tmp3
+ lda.w npc_ptrs+2,y
+ bra @q
+@h:
  lda.w hero_ptrs,y
  sta tmp3
  lda.w hero_ptrs+2,y
@@ -243,11 +277,15 @@ BuildOam:
  stz oamn
  lda camx                   ; the middle of the screen in picture space less the projection's offset
  clc
- adc #128-PIC_KX
+ adc #128
+ sec
+ sbc picKX
  sta flx
  lda camy
  clc
- adc #112-PIC_KY
+ adc #112
+ sec
+ sbc picKY
  sta fly
  stz ol_n
  stz ndyn                   ; the things that move, sorted by depth
@@ -586,6 +624,13 @@ EmitActor:
  lda #5
  bra @pal
 @nf:
+ lda.w ekind,x
+ cmp #KIND_PEOPLE
+ bcc @mp
+ txa                        ; a person: the palette of its place
+ lsr
+ bra @pal
+@mp:
  lda #0
  cpx #0
  beq @pal

@@ -81,7 +81,9 @@ let view = [0 * -P.h - P.z[0] * -P.h, P.z[0] * P.x[1] - P.x[0] * P.z[1], P.x[0] 
 view = [(0) * P.z[1] - P.z[0] * (-P.h), P.z[0] * P.x[1] - P.x[0] * P.z[1], P.x[0] * (-P.h) - 0 * P.x[1]];
 if (view[1] < 0) view = view.map((v) => -v);
 const depth = (p) => p[0] * view[0] + p[1] * view[1] + p[2] * view[2];
-const half = 36, corners = [[-half, 0, -half], [half, 0, -half], [-half, 0, half], [half, 0, half]];
+// --size=WxH: the area's size in metres (its grid); the picture covers it, and depths are counted from its corner
+const [AW, AH] = (process.argv.find((a) => a.startsWith('--size=')) || '--size=72x72').slice(7).split('x').map(Number);
+const hw = AW / 2, hh = AH / 2, corners = [[-hw, 0, -hh], [hw, 0, -hh], [-hw, 0, hh], [hw, 0, hh]];
 const minX = Math.floor(Math.min(...corners.map(sx)) / 8) * 8, maxX = Math.ceil(Math.max(...corners.map(sx)) / 8) * 8;
 const minY = Math.floor((Math.min(...corners.map(sy)) - 6 * P.h) / 8) * 8, maxY = Math.ceil(Math.max(...corners.map(sy)) / 8) * 8;
 const W = maxX - minX, H = maxY - minY;
@@ -115,7 +117,7 @@ function raster(list, W, H, ox, oy, depthOut = null) {
       }
       if (front) {                      // only what stands up from the floor, with where its foot is (screen depth)
         if (t.v[0].p[1] * w0 + t.v[1].p[1] * w1 + t.v[2].p[1] * w2 < 0.35) continue;
-        front[o] = ((t.v[0].p[0] * w0 + t.v[1].p[0] * w1 + t.v[2].p[0] * w2 + 36) * 16 + (t.v[0].p[2] * w0 + t.v[1].p[2] * w1 + t.v[2].p[2] * w2 + 36) * 16) / 2;
+        front[o] = ((t.v[0].p[0] * w0 + t.v[1].p[0] * w1 + t.v[2].p[0] * w2 + hw) * 16 + (t.v[0].p[2] * w0 + t.v[1].p[2] * w1 + t.v[2].p[2] * w2 + hh) * 16) / 2;
       }
       zb[o] = z; cov[o] = 1;
       for (let k = 0; k < 3; k++) col[o * 3 + k] = texel[k] * (t.v[0].c[k] * w0 + t.v[1].c[k] * w1 + t.v[2].c[k] * w2);
@@ -134,8 +136,8 @@ function raster(list, W, H, ox, oy, depthOut = null) {
 if (process.argv.includes('--front')) {
   fs.mkdirSync(path.join(root, 'out', 'game'), { recursive: true });
   const depthOut = new Int16Array(W * H);
-  writePNG(path.join(root, 'out', 'game', 'front.png'), W, H, raster(tris.filter((t) => !t.ground), W, H, 0, 0, depthOut));
-  fs.writeFileSync(path.join(root, 'out', 'game', 'front_depth.bin'), Buffer.from(depthOut.buffer));
+  writePNG(path.join(root, 'out', 'game', `front_${area}.png`), W, H, raster(tris.filter((t) => !t.ground), W, H, 0, 0, depthOut));
+  fs.writeFileSync(path.join(root, 'out', 'game', `front_${area}.bin`), Buffer.from(depthOut.buffer));
   console.log('front layer written');
   process.exit(0);
 }

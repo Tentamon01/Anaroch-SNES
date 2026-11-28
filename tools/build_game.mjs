@@ -8,7 +8,7 @@ const root = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
 const out = path.join(root, 'out');
 const spc = JSON.parse(fs.readFileSync(path.join(out, 'audio', 'spc.json'), 'utf8'));          // (tools/build_audio.mjs)
 const { rom, syms } = assemble(path.join(root, 'src', 'game.asm'), { banks: 64, defines: { MODE7: 0, SPC_SIZE: spc.size, SPC_ENTRY: spc.entry } });
-const data = Buffer.alloc(0x100000);
+const data = fs.readFileSync(path.join(out, 'game', 'world_pages.bin'));       // (tools/build_world.py)
 fs.writeFileSync(path.join(out, 'anaroch_game.sfc'), Buffer.concat([rom, data]));
 fs.writeFileSync(path.join(out, 'anaroch_game.sym.json'), JSON.stringify(syms, null, 1));
 const mem = (type, size, content, extra = []) => ['    memory', `      type:    ${type}`, `      size:    0x${size.toString(16)}`, `      content: ${content}`, ...extra];

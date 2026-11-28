@@ -670,9 +670,8 @@ UseThing:
  lda #msg_skill
  bra @used
 @portal:
- lda #msg_notown
- sta msgp
- clc
+ jsr OpenPortal             ; (it says why not)
+ bcs @gone
  rts
 @identify:
  lda #msg_choose

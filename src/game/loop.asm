@@ -50,7 +50,7 @@ MainLoop:
 @go:
  jmp (jmpv)
 
-mode_jt: .word GamePlay, GameDead, GamePause, GameStats, GameBag
+mode_jt: .word GamePlay, GameDead, GamePause, GameStats, GameBag, GameTravel
 
 GamePlay:
  .a16
@@ -80,7 +80,14 @@ GamePlay:
  lda mode
  cmp #M_BAG
  beq @bag
- jmp UpdateWorld
+ jsr UpdateWorld
+ lda mode
+ bne @bag
+ jsr TalkUpdate
+ jsr PortalUpdate
+ lda mode
+ bne @bag
+ jmp CheckGates
 @bag:
  rts
 

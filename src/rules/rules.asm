@@ -11,6 +11,7 @@
 .include "bag.asm"
 .include "skills.asm"
 .include "skillui.asm"
+.include "shop.asm"
 
 X_NewKit:      jsr NewKit
  rtl
@@ -45,6 +46,15 @@ X_SkillsCalm:  jsr SkillsCalm
 X_SkillHud:    jsr SkillHud
  rtl
 X_SkillOpen:   jsr SkillOpen
+ rtl
+X_ShopStock:   jsr ShopStock
+ rtl
+X_ShopOpen:    stz sayt
+ jsr ShopOpen
+ rtl
+X_Appraise:    jsr Appraise
+ rtl
+X_PortalFx:    jsr PortalFx
  rtl
 X_MonsterHit:  jsr MonsterHit
  rtl

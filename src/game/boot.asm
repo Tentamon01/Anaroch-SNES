@@ -46,6 +46,13 @@ Reset:
  jsr UploadSound
  jsl $800000+SplashPlay     ; the studio's splash
  jsr InitVideo
+ ldx #8                     ; the bars' table in work memory, so a fade can dim it
+@bars:
+ lda.w bars,x
+ sta barsR,x
+ dex
+ dex
+ bpl @bars
  jsr NewGame
  jsr UpdateCam
  jsr FullMap
@@ -55,7 +62,7 @@ Reset:
  .a8
  stz $4370                  ; HDMA channel 7: the brightness, blank bars above and below
  stz $4371
- ldx #bars
+ ldx #barsR
  stx $4372
  stz $4374
  lda #216
@@ -158,18 +165,7 @@ InitVideo:
  lda #$6BA0
  sta n2
  jsr DmaV
- jsr InitColors
- lda #wglow_tiles
- sta n0
- lda #^wglow_tiles
- sta n1
- lda #$4C00
- sta n2
- lda #GLOW_BYTES
- sta n3
- lda #$80
- sta n4
- jsr DmaV
+ jsr PlaceVideo             ; the place's glow and colours (nothing yet at boot)
  rts
 
 ; every colour the game shows (the bag screen has its own: this brings them back)
@@ -188,13 +184,16 @@ InitColors:
  lda #16
  sta n2
  jsr DmaC
- lda #world_pals
+ lda #W_PALS
  sta n0
+ lda #$007F
+ sta n1
  lda #32
  sta n2
  lda #192
  sta n3
  jsr DmaC
+ stz n1
  lda #obj_pals
  sta n0
  lda #128
@@ -202,21 +201,24 @@ InitColors:
  lda #256
  sta n3
  jsr DmaC
- lda #occ_pal           ; sprite palette 6: the walk-behind blocks
+ lda #W_PALS+192        ; sprite palette 6: the walk-behind blocks
  sta n0
+ lda #$007F
+ sta n1
  lda #224
  sta n2
  lda #32
  sta n3
  jsr DmaC
- lda #glow_pal          ; colours 21-23: BG3's palette 5 (unused by the gold text)
+ lda #W_PALS+224        ; colours 21-23: BG3's palette 5 (unused by the gold text)
  sta n0
  lda #21
  sta n2
  lda #6
  sta n3
  jsr DmaC
- rts
+ stz n1
+ jmp PeoplePals         ; the townspeople's colours, in the monsters' places
 
 ; n0 = source, n1 = bank, n2 = VRAM word address, n3 = bytes, n4 = VMAIN; DmaVc: A = the DMA mode and register
 DmaV:

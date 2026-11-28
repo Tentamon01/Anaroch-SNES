@@ -4,27 +4,27 @@ CellType:
  .a16
  .i16
  lda tmp6
- cmp #72*16
+ cmp areaW
  bcs @out
  lda tmp7
- cmp #72*16
+ cmp areaH
  bcs @out
- and #$FFF0                 ; row * 16 -> row * 72
- lsr
- sta ct2
- asl
- asl
- asl
- clc
- adc ct2
- sta ct2
+ lsr4                       ; row * the grid's width
+ sep #$20
+ .a8
+ sta $4202
+ lda gridW
+ sta $4203
+ rep #$20
+ .a16
  lda tmp6
  lsr4
+ nop
  clc
- adc ct2
+ adc $4216
  phx
  tax
- lda.l coll,x
+ lda.l $7F0000+W_GRID,x
  plx
  and #$00FF
  rts

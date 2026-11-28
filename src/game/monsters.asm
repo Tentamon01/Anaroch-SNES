@@ -96,15 +96,19 @@ MonsterSpawn:
 PickSpawn:
  .a16
  .i16
- lda #SPAWN_COUNT
+ lda nSpawns
  jsr RandRange
  asl
  asl
+ phx
+ tax
+ lda.l $7F0000+W_SPAWNS+2,x
  tay
- lda.w spawn_tab,y
+ lda.l $7F0000+W_SPAWNS,x
+ plx
  asl4
  sta.w ex,x
- lda.w spawn_tab+2,y
+ tya
  asl4
  sta.w ey,x
  rts
@@ -112,6 +116,15 @@ PickSpawn:
 UpdateMonster:
  .a16
  .i16
+ lda.w est,x
+ cmp #ST_NPC
+ bne @mon
+ jmp NpcUpdate
+@mon:
+ lda safeArea               ; no monster rises where people live
+ beq @wild
+ rts
+@wild:
  lda.w est,x
  cmp #ST_DEAD
  bcs @go

@@ -362,7 +362,8 @@ msg_fullstam: .byte "FULL STAMINA", 0
 msg_stamina:  .byte "STAMINA", 0
 msg_winds:    .byte "+10% ALL RESIST", 0
 msg_skill:    .byte "+1 SKILL POINT", 0
-msg_notown:   .byte "NO TOWN TO GO TO YET", 0
+msg_intown:   .byte "ALREADY IN TOWN", 0
+msg_portal:   .byte "A PORTAL OPENS", 0
 msg_choose:   .byte "CHOOSE A PIECE", 0
 msg_bagfull:  .byte "BAG FULL", 0
 msg_beltfull: .byte "BELT FULL", 0

@@ -112,6 +112,11 @@ UpdateDrops:
  lda mode
  bne @r
  lda tmpB
+ cmp #$FFFF
+ bne @thing
+ jsr NearPerson             ; nothing on the ground: someone to talk to?
+@thing:
+ lda tmpB
  cmp nearshown
  beq @same
  sta nearshown
@@ -123,6 +128,12 @@ UpdateDrops:
  lda padnew
  and #PAD_A
  beq @r
+ lda tmpB
+ bpl @drop
+ and #$7FFF
+ tax
+ jmp Talk
+@drop:
  ldx tmpB
  lda.w dtyp,x
  cmp #3
@@ -155,6 +166,9 @@ ShowPrompt:
  lda #21
  jmp ClearRow
 @show:
+ bpl @thing
+ jmp PersonPrompt
+@thing:
  tax
  lda.w dtyp,x
  cmp #3

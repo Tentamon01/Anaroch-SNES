@@ -57,6 +57,7 @@ ST_ATTACK = 2
 ST_HIT = 3
 ST_DEAD = 4
 ST_GONE = 5
+ST_NPC = 6                   ; a townsperson (past ST_DEAD: nothing can strike them)
 
 ; modes
 M_PLAY = 0
@@ -64,6 +65,7 @@ M_DEAD = 1
 M_PAUSE = 2
 M_STATS = 3
 M_BAG = 4
+M_TRAVEL = 5                 ; between two places
 
 NACT = 9                     ; the hero + 8 monsters
 RING_C = 33                  ; the streamed window, in tiles
@@ -82,6 +84,7 @@ CH_GT = FONT_BASE+44
 
 .include "game/ram.asm"                   ; work memory
 .include "rules/vars.asm"                 ; the RPG's memory
+.include "world_ram.inc"                  ; the place's numbers (tools/build_world.py)
 .include "game/boot.asm"                  ; reset and the video chip's setup
 .include "game/frame.asm"                 ; the frame interrupt: everything for the video chip
 .include "game/loop.asm"                  ; the main loop and the game's modes
@@ -98,6 +101,8 @@ CH_GT = FONT_BASE+44
 .include "game/charwin.asm"               ; the character window
 .include "game/sprites.asm"               ; sprite pictures and the sprite list
 .include "game/far.asm"                   ; doors for the rules, the bag screen's video work
+.include "game/area.asm"                  ; the places: loading, gates, the town portal
+.include "game/people.asm"                ; the townspeople and their words
 .include "game/tables.asm"                ; tables and words
 .include "occlude.asm"
 .include "sound.asm"

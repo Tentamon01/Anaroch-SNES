@@ -734,9 +734,13 @@ BagInfo:
  .i16
  lda #INFO_Y
  sta infoY
+ lda #INFO_X
+ sta infoX
  jsr Selected
  cmp #$FFFF
- bne @item
+ beq @none
+ jmp ItemPanel
+@none:
  lda bagZone
  bne @r
  lda bagDoll                ; an empty box: what goes there
@@ -752,7 +756,10 @@ BagInfo:
  jmp InfoLine
 @r:
  rts
-@item:
+; the words on piece A from line infoY, column infoX
+ItemPanel:
+ .a16
+ .i16
  sta it
  sta infoIt
  jsr ItemName
@@ -910,7 +917,7 @@ InfoLine:
  asl4
  asl
  clc
- adc #INFO_X
+ adc infoX
  jsr Show
  inc infoY
 @r:
@@ -1133,7 +1140,11 @@ BagInput:
  .i16
  lda bagPage
  beq @bag
+ cmp #2
+ beq @shop
  jmp SkillInput
+@shop:
+ jmp ShopInput
 @bag:
  lda padnew
  and #PAD_B | PAD_SELECT | PAD_START
@@ -1411,6 +1422,7 @@ PressX:
  .a16
  .i16
  stz msgp
+ stz portalNew
  jsr Selected
  cmp #$FFFF
  beq @r
@@ -1436,6 +1448,9 @@ PressX:
  jsr BagRebuild
  lda #SFX_DRINK
  jsl FarSfx
+ lda portalNew              ; a portal opened: back to walk into it
+ beq @r
+ jmp BagClose
 @r:
  jmp BagDraw
 

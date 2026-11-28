@@ -101,7 +101,7 @@ def place_pose(im, ox, oy):
     return main, extra, (dx, dy, ex, ey), len(cut) - kept, len(pts)
 
 
-def load_char(name, folder=None):
+def load_char(name, folder=None, picks=None):
     """the N64 game's sheets; folder: our own renders (tools/make_skeleton.mjs)"""
     hdr = open(os.path.join(folder or os.path.join(N64, 'src'), f'spr_{name}.h')).read()
     W = int(re.search(r'SPR_%s_W (\d+)' % name.upper(), hdr).group(1))
@@ -139,9 +139,10 @@ def load_char(name, folder=None):
         rgb = Image.blend(Image.new('RGB', im.size, (mean,) * 3), im.convert('RGB'), 1.2)
         rgb = ImageEnhance.Brightness(rgb).enhance(0.86)
         return Image.merge('RGBA', rgb.split() + (al,))
+    picks = picks or PICK
     for d in range(8):
         row = []
-        for a, i in PICK:
+        for a, i in picks:
             f = frame(a, d, i)
             r, g, b, al = f.split()
             z = Image.new('L', f.size, 0)
@@ -160,7 +161,7 @@ def load_char(name, folder=None):
     frames = []
     for d in range(8):
         for k, f in enumerate(seq[d]):
-            extra = extras[d * len(PICK) + k] if PLACED else None
+            extra = extras[d * len(picks) + k] if PLACED else None
             frames.append(enc(f) + (enc(extra) if extra else b''))
     if PLACED:
         print(f'{name}: {sum(1 for e in extras if e)} poses with an extra piece, {100 * lost / total:.2f} % of the figure still cut')
@@ -175,6 +176,10 @@ ghoul, ghoul_cols, ghoul_seq, ghoul_meta = load_char('ghoul')
 SKEL = os.path.join(OUT, 'skel_src')
 assert os.path.exists(os.path.join(SKEL, 'spr_skel.h')), 'run: node tools/make_skeleton.mjs'
 skel, skel_cols, skel_seq, skel_meta = load_char('skel', SKEL)
+
+# the people of Stormreach (tools/places.py's order): standing and walking only
+PEOPLE = ['tf_farmer', 'tf_oldw', 'tf_guard', 'npcm1', 'npca1', 'tf_inn', 'tf_bard']
+people = [load_char(n, picks=PICK[:6]) for n in PEOPLE] if PLACED else []
 
 def blue(c): return (int(c[0] * 0.55), int(c[1] * 0.7), min(255, int(c[2] * 1.2 + 60)))
 def red(c): return (min(255, int(c[0] * 0.6 + 110)), int(c[1] * 0.45), int(c[2] * 0.45))
@@ -308,7 +313,8 @@ FONT = {
 }
 CHARS = ' 0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ/:+-.()>\'!'
 if PLACED:
-    CHARS += '%,'; FONT['%'] = '11001 11010 00010 00100 01000 01011 10011'; FONT[','] = '00000 00000 00000 00000 01100 00100 01000'
+    CHARS += '%,?'; FONT['%'] = '11001 11010 00010 00100 01000 01011 10011'; FONT[','] = '00000 00000 00000 00000 01100 00100 01000'
+    FONT['?'] = '01110 10001 00001 00010 00100 00000 00100'
 FONT_BASE = len(hud_tiles)
 for ch in CHARS:
     rows = FONT[ch].split() if FONT[ch] else []
@@ -324,7 +330,7 @@ for ch in CHARS:
     add_tile(px)
 CHARMAP = {c: FONT_BASE + i for i, c in enumerate(CHARS)}
 FONT2_BASE = len(hud_tiles)                 # the same letters on the panel's ground (for the character window)
-for i in range(len(CHARS)):
+for i in range(len(CHARS) - (2 if PLACED else 0)):      # (the window never writes the last two)
     add_tile([1 if v == 0 else v for v in hud_tiles[FONT_BASE + i]])
 
 # vial: 2 columns x 6 rows; per tile row 9 states: 0 = empty .. 8 = full (cut from the top)
@@ -797,15 +803,30 @@ for mode7 in (False, True):
     blob(f'pbucket_{tag}', bytes(sdat))
 assert cur['pc'] <= 0x10000
 lines.append(f'ROM_BANKS = {cur["bank"] + 1}')
+npc_ptrs = []
+if PLACED:                                  # the people's pictures: banks 16 on
+    for f in os.listdir(OUT):
+        if re.match(r'person\d_\d+\.bin$', f): os.remove(os.path.join(OUT, f))
+    cur['bank'] = 16; cur['pc'] = 0x8000; lines.append('.bank 16')
+    for k_, q_ in enumerate(people): npc_ptrs += place(q_[0], f'person{k_}')
+    assert cur['bank'] < 34
 lines += ['.bank 0', '.org $E000']
 for nm, ptrs in (('hero_ptrs', hp_), ('ghoul_ptrs', gp_), ('skel_ptrs', kp_)):
     lines.append(f'{nm}:')
     for k2 in range(0, len(ptrs), 8): lines.append(' .long ' + ', '.join(ptrs[k2:k2 + 8]))
 if PLACED:      # per frame: the square's shift, and the extra piece's (x = -128: none); ghouls, skeletons, the hero
-    lines.append(f'meta_base: .word 0, {len(ghoul_meta) * 4}, {(len(ghoul_meta) + len(skel_meta)) * 4}')
+    base_ = [0, len(ghoul_meta), len(ghoul_meta) + len(skel_meta)]
+    n_ = base_[2] + len(hero_meta)
+    for q_ in people: base_.append(n_); n_ += len(q_[3])
+    lines.append('meta_base: .word ' + ', '.join(str(v * 4) for v in base_))      # by kind: ghoul, skeleton, hero, people
     lines.append('fmeta:')
-    for m_ in (ghoul_meta, skel_meta, hero_meta):
+    for m_ in [ghoul_meta, skel_meta, hero_meta] + [q_[3] for q_ in people]:
         for k2 in range(0, len(m_), 6): lines.append(' .byte ' + ', '.join(str(v & 0xFF) for q in m_[k2:k2 + 6] for v in q))
+if PLACED:
+    lines.append('npc_ptrs:')
+    for k2 in range(0, len(npc_ptrs), 8): lines.append(' .long ' + ', '.join(npc_ptrs[k2:k2 + 8]))
+    lines.append('npc_pals:')
+    for q_ in people: lines.append(' .word ' + w16(pal16(q_[1])))
 pals = [pal16(hero_cols), pal16(ghoul_cols), pal16(skel_cols), pal16(ghoul_cols, blue), pal16(skel_cols, blue), pal16(hero_cols, red),
         [0] + [bgr555(c) for c in prop_cols], [0] + [bgr555(c) for c in small_cols]]
 lines.append('obj_pals:')

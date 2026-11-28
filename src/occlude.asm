@@ -47,9 +47,10 @@ Occlude:
  clc
  adc #20
  lsr4
- cmp #OCC_W
+ cmp occW
  bcc @x1
- lda #OCC_W-1
+ lda occW
+ dec a
 @x1:
  sta obx1
  lda oby
@@ -63,9 +64,10 @@ Occlude:
  clc
  adc #10                    ; (feet and fallen bodies reach a few lines below the ground point)
  lsr4
- cmp #OCC_H
+ cmp occH
  bcc @y1
- lda #OCC_H-1
+ lda occH
+ dec a
 @y1:
  sta oby1
  lda orow
@@ -91,7 +93,7 @@ Occlude:
  lda oby
  asl
  tax
- lda.w occrow,x
+ lda.l $7F0000+W_OCCROW,x
  sta orow
  lda obx0
  asl
@@ -100,7 +102,7 @@ Occlude:
  tax
  ldy obx1
 @col:
- lda.l wocc_map,x
+ lda.l $7F0000+W_OCCMAP,x
  bne @some
 @next:
  inx
@@ -124,14 +126,14 @@ Occlude:
  asl
  bcs @south
  bmi @east
- lda.l wocc_depth,x
+ lda.l $7F0000+W_OCCDEP,x
  bra @have
 @south:                     ; a wall running south: its foot comes 1 nearer for every column to the left
  lda obx
  sec
  sbc opx
  clc
- adc.l wocc_depth,x
+ adc.l $7F0000+W_OCCDEP,x
  bra @have
 @east:                      ; one running east: half a step nearer for every column to the right
  lda opx
@@ -140,7 +142,7 @@ Occlude:
  cmp #$8000
  ror
  clc
- adc.l wocc_depth,x
+ adc.l $7F0000+W_OCCDEP,x
 @have:
  sec
  sbc fly
@@ -218,17 +220,17 @@ AddBlock:
  clc
  adc ocnt
  tay
- lda oid
+ lda oid                    ; 512 blocks to a bank of the data ROM
  xba
  and #$00FF
+ lsr
  clc
- adc #OCC_BANK
+ adc occBank
  sta.w oq+2,y
  lda oid
- and #$00FF
+ and #$01FF
  xba
  lsr
- ora #$8000
  sta.w oq,y
  lda.w ob_tile,x
  asl4

@@ -116,6 +116,8 @@ oid:      .res 2
 ocnt:     .res 2
 sglow:    .res 2
 gmp:      .res 4
+aptr:     .res 3             ; a place's record in the data ROM
+talkLine: .res 2             ; the words being said
 
 .ram $0100
 ex:       .res NACT*2
@@ -211,6 +213,31 @@ oq:       .res 24
 dyn_key:  .res 128
 dyn_rx:   .res 128
 dyn_ref:  .res 128
+.ram $1C40                   ; the places (after world_ram.inc's words), the portal, talk and trade
+barsR:    .res 10            ; the HDMA table of the picture's brightness
+placeId:  .res 2
+goPlace:  .res 2             ; where a fade leads, and where the hero stands there
+goX:      .res 2
+goY:      .res 2
+goDir:    .res 2
+portalOn: .res 2
+portalPlace: .res 2
+portalX:  .res 2
+portalY:  .res 2
+portalT:  .res 2
+portalNew: .res 2            ; just opened (the bag closes)
+closePortal: .res 2
+talkT:    .res 2
+talkI:    .res 2
+talkWith: .res 2
+talkWho:  .res 2
+appraiseT: .res 2
+shopSell: .res 2
+shopCur:  .res 2
+shopTop:  .res 2
+shopN:    .res 2
+shopArm:  .res 2
+infoX:    .res 2
 .ram $0540
 oam:      .res 544
 .ram $0800
