@@ -10,6 +10,12 @@ MainLoop:
  sta padnew
  lda pad
  sta padold
+ lda startAsk               ; a saved game at power on: load it, or play anew
+ beq @nask
+ stz startAsk
+ jsl $800000+X_StartScreen
+ stz padnew
+@nask:
  lda mode
  asl
  tax
@@ -50,7 +56,7 @@ MainLoop:
 @go:
  jmp (jmpv)
 
-mode_jt: .word GamePlay, GameDead, GamePause, GameStats, GameBag, GameTravel
+mode_jt: .word GamePlay, GameDead, GamePlay, GameStats, GameBag, GameTravel
 
 GamePlay:
  .a16
@@ -58,12 +64,8 @@ GamePlay:
  lda padnew
  and #PAD_START
  beq @np
- lda #M_PAUSE
- sta mode
- lda #MSG_ROW1
- ldx #str_paused
- ldy #$0000|HUD_PRIO
- jmp PrintCenter
+ jsl $800000+X_PauseOpen    ; resume, save, load
+ rts
 @np:
  lda padnew
  and #PAD_SELECT
@@ -154,13 +156,3 @@ GameDead:
 @r:
  rts
 
-GamePause:
- .a16
- lda padnew
- and #PAD_START
- beq @r
- lda #MSG_ROW1
- jsr ClearRow
- stz mode
-@r:
- rts

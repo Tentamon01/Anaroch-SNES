@@ -10,7 +10,6 @@ dir_of:     .word $FFFF, 6, 2, $FFFF, 0, 7, 1, $FFFF, 4, 5, 3, $FFFF, $FFFF, $FF
 arrow_tile: .word $C6, $C8, $CA, $CC, $CE, $E0, $E2, $E4
 drop_tile:  .word $C2, $C0, $C4          ; by type: gold, (a piece: DropTile), a tome
 
-str_paused:      .byte "PAUSED", 0
 str_died:        .byte "YOU HAVE DIED", 0
 str_rise:        .byte "PRESS START TO RISE AGAIN", 0
 str_empty:       .byte "EMPTY SLOT", 0

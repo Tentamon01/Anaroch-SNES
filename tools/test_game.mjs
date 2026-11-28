@@ -38,6 +38,7 @@ for (let f = 0; f < N; f++) {
     const m = 1 + rnd(8);
     if (w(sy.est + m * 2) < 4) { pw(sy.ex + m * 2, w(sy.ex)); pw(sy.ey + m * 2, w(sy.ey) + 200); pw(sy.ehp + m * 2, 1); pw(sy.echamp + m * 2, rnd(2)); pw(sy.edir, 0); }
   }
+  if (f % 701 === 350 && w(sy.mode) === 0) s.pad = 0x1000;               // Start: pause, and so save and load
   if (f % 7 === 0 && w(sy.mode) === 0) s.pad |= 0x0080;                  // A: pick up
   if (f % 601 === 300 && w(sy.mode) === 0) s.pad = 0x2000;               // Select: the bag
   if (w(sy.mode) === 4) {                                                // in the bag: buttons at random, then close

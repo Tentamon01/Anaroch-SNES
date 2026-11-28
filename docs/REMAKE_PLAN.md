@@ -129,8 +129,8 @@ Each step ends in a ROM you can run, and the next starts after you have seen it.
 - *2a (done, approved 2026-11-27):* stats, items, bag and equipment, belt, drops. Also the studio's splash, as the
   N64's.
 - *2b (done, approved 2026-11-27):* skills and their trees, stamina, the skill button.
-- *2c (built 2026-11-27):* Stormreach Keep with its houses, people and shop, gates between places, the town portal.
-- *2d:* saving.
+- *2c (done, approved 2026-11-27):* Stormreach Keep with its houses, people and shop, gates between places, the town portal.
+- *2d (built 2026-11-27):* saving: three slots, the pause menu, load or new game at power on.
 
 **3. Act I complete**
 - All its areas, quests, the mercenary, waypoints, the act's boss drawn by the SuperFX.

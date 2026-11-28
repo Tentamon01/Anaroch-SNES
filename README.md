@@ -93,10 +93,12 @@ three-quarter view; out of its west gate lies the graveyard with eight monsters.
   15 passives and 21 skills that are cast.
 - **Step 2, part 3:** Stormreach Keep and its three houses, seven townspeople with the N64 version's words, Gideon's
   shop, Brother Ansel who identifies for gold, gates between the places, the Scroll of Town Portal, and rising in town
-  after death. Part to come: saving.
+  after death.
+- **Step 2, part 4:** saved games: three slots in the cartridge's battery memory, from the pause menu, and a screen at
+  power on to load one or begin anew. This completes step 2.
 
 Pad: B attack, Y use the skill on the button, R the next learned skill onto it, A pick up, X drink or read from the
-belt, L the next belt place, Select the bag, Start pause. A also talks and trades; walking into a gate or a door
+belt, L the next belt place, Select the bag, Start the pause menu (resume, save, load). A also talks and trades; walking into a gate or a door
 takes you through.
 In the bag: A wear or take off, X use, Y drop, L the skill trees, R the character window.
 At the merchant: Up / Down choose, A buy (twice to sell), L or R change between buying and selling, B leave.
@@ -112,12 +114,16 @@ In the skill trees: A learn, Y put on the button, L the character window, R the 
     node tools/test_rules.mjs                    # the item, stat, damage and experience rules, called in the ROM
     node tools/test_skills.mjs                   # every skill cast in the ROM, every passive measured
     node tools/test_places.mjs                   # every place, gate and person, the shop, the portal, death
+    node tools/test_saves.mjs                    # saving, loading, power off and on, damaged slots
     node tools/test_game.mjs 3000                # random play; every shown tile and the text layer checked
     ares_dual/ares.exe --system "Super Famicom" --no-file-prompt out/anaroch_game.sfc
 
 - **Places:** `tools/places.py` lists them with their gates and people. Each is a package in the cartridge's data ROM
   (one megabyte a page, read through the SPC7110); entering one copies its tables to work memory
   (`src/game/area.asm`).
+- **Saved games** (`src/rules/save.asm`): what the N64 version keeps (level, experience, gold, stats, skills, belt,
+  worn pieces, bag) in three checksummed slots in the board's save memory at `$70:0000`. Loading puts the hero in
+  Stormreach. ares keeps it in `out/anaroch_game.ram`; a game is replaced only at a second press.
 - **Source:** `src/game.asm` and `src/game/*.asm`; the rules, the skills and their screens in `src/rules/` (ROM bank 42); the
   splash player in `src/splash.asm`. (The first version's `src/main.asm` is kept for its own build.)
 - **Not yet like the N64:** the hero always looks like a swordsman, whatever is worn; a bow shoots but is not drawn;

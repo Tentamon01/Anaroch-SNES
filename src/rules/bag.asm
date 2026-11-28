@@ -1142,7 +1142,11 @@ BagInput:
  beq @bag
  cmp #2
  beq @shop
+ cmp #3
+ beq @save
  jmp SkillInput
+@save:
+ jmp SaveInput
 @shop:
  jmp ShopInput
 @bag:

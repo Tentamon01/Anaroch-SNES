@@ -238,6 +238,10 @@ shopTop:  .res 2
 shopN:    .res 2
 shopArm:  .res 2
 infoX:    .res 2
+saveView: .res 2             ; the pause menu and the saved games' screens
+saveCur:  .res 2
+saveArm:  .res 2
+startAsk: .res 2             ; show them on the first frame
 .ram $0540
 oam:      .res 544
 .ram $0800

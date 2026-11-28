@@ -13,6 +13,6 @@ fs.writeFileSync(path.join(out, 'anaroch_game.sfc'), Buffer.concat([rom, data]))
 fs.writeFileSync(path.join(out, 'anaroch_game.sym.json'), JSON.stringify(syms, null, 1));
 const mem = (type, size, content, extra = []) => ['    memory', `      type:    ${type}`, `      size:    0x${size.toString(16)}`, `      content: ${content}`, ...extra];
 fs.writeFileSync(path.join(out, 'anaroch_game.bml'), ['game', '  name:   anaroch_game', '  title:  Anaroch', '  region: NTSC', '  board:  ANAROCH-DUAL',
-  ...mem('ROM', rom.length, 'Program'), ...mem('ROM', data.length, 'Data'), ...mem('RAM', 0x20000, 'Save', ['      volatile']), '    oscillator', '      frequency: 21440000', ''].join('\n'));
+  ...mem('ROM', rom.length, 'Program'), ...mem('ROM', data.length, 'Data'), ...mem('RAM', 0x20000, 'Save'), '    oscillator', '      frequency: 21440000', ''].join('\n'));
 const top = Math.max(...Object.entries(syms).filter(([k, v]) => v < 0x100 && /^[a-z]/.test(k) && k.length > 1).map(([, v]) => v));
 console.log('wrote out/anaroch_game.sfc', rom.length, 'bytes of program; direct page used to $' + top.toString(16));

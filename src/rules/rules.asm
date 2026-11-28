@@ -12,6 +12,7 @@
 .include "skills.asm"
 .include "skillui.asm"
 .include "shop.asm"
+.include "save.asm"
 
 X_NewKit:      jsr NewKit
  rtl
@@ -55,6 +56,12 @@ X_ShopOpen:    stz sayt
 X_Appraise:    jsr Appraise
  rtl
 X_PortalFx:    jsr PortalFx
+ rtl
+X_PauseOpen:   jsr PauseOpen
+ rtl
+X_StartScreen: jsr StartScreen
+ rtl
+X_AnySave:     jsr AnySave
  rtl
 X_MonsterHit:  jsr MonsterHit
  rtl

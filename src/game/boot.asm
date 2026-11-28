@@ -54,6 +54,10 @@ Reset:
  dex
  bpl @bars
  jsr NewGame
+ jsl $800000+X_AnySave
+ bcc @nosave
+ inc startAsk
+@nosave:
  jsr UpdateCam
  jsr FullMap
  jsr HudRefresh

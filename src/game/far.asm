@@ -1,4 +1,7 @@
 ; Doors for the rules (bank 42) into the game's routines, and the bag screen's work with the video chip.
+FarRise:                     ; a loaded game: into Stormreach
+ jsr RiseAgain
+ rtl
 FarRand:
  jsr Rand
  rtl

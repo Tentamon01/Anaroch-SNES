@@ -412,18 +412,7 @@ ShopOpen:
  stz shopArm
  stz msgp
  jsr MenuBegin
- ldx #0                     ; the colours
- sep #$20
- .a8
- stz $2121
-@col:
- lda.l menu_pal,x
- sta $2122
- inx
- cpx #256
- bne @col
- rep #$20
- .a16
+ jsr MenuColours
  jsr ShopDraw
  jmp MenuShow
 
